@@ -1,0 +1,52 @@
+<!-- teacher/attendance.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance - Smart Classroom Timetable</title>
+    <link rel="stylesheet" href="C:\Users\Janan\OneDrive\Desktop\vac sih project\smart-classroom-frontend\css\shared.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-chalkboard-teacher"></i>
+            <span>Teacher Dashboard</span>
+        </div>
+        <ul class="sidebar-menu">
+            <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+            <li><a href="timetable.html"><i class="fas fa-calendar-alt"></i> Timetable</a></li>
+            <li><a href="attendance.html"><i class="fas fa-list"></i> Attendance</a></li>
+            <li><a href="available-classes.html"><i class="fas fa-book-open"></i> Available Classes</a></li>
+            <li><a href="C:\Users\Janan\OneDrive\Desktop\vac sih project\smart-classroom-frontend\login.html"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+        </ul>
+    </nav>
+    <main class="main-content">
+        <header class="page-header">
+            <h1>Mark Attendance</h1>
+            <p>Select class and students.</p>
+        </header>
+        <div class="container">
+            <div class="attendance-section">
+                <select class="form-select">
+                    <option>Math 101 - Today</option>
+                </select>
+                <div class="student-list">
+                    <div class="student-item">
+                        <span>John Doe</span>
+                        <label class="switch">
+                            <input type="checkbox" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <!-- More students -->
+                </div>
+                <button class="btn btn-primary">Save Attendance</button>
+            </div>
+        </div>
+    </main>
+    <script src="../../js/shared.js"></script>
+</body>
+</html>

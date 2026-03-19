@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Subjects | Smart Classroom Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/shared.css"> <!-- Adjust path -->
+    <style>
+        body { font-family: 'Poppins', sans-serif; background: #f4f6fb; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: #fff; padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+        h2 { color: #6c5ce7; margin-bottom: 20px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; color: #555; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+        button { padding: 12px 24px; background: #6c5ce7; color: #fff; border: none; border-radius: 8px; cursor: pointer; margin: 5px; }
+        button:hover { background: #5a4fcf; }
+        button.delete { background: #e74c3c; }
+        button.delete:hover { background: #c0392b; }
+        .loader { display: none; text-align: center; margin: 20px 0; }
+        .loader i { font-size: 2em; color: #6c5ce7; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .success, .error { padding: 10px; border-radius: 8px; margin: 20px 0; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .main-content { margin-left: 220px; padding: 20px; }
+    </style>
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-user-shield"></i>
+            <span>Admin Dashboard</span>
+        </div>
+        <ul class="sidebar-menu">
+            <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+            <li><a href="timetable-generate.html"><i class="fas fa-plus-circle"></i> Generate Timetable</a></li>
+            <li><a href="timetable-viewer.html"><i class="fas fa-book-open"></i> View Timetable</a></li>
+            <li><a href="attendance.html"><i class="fas fa-list"></i> Attendance</a></li>
+            <li><a href="timetable-rules.html"><i class="fas fa-exchange-alt"></i> TimeTable Rule</a></li>
+            <li><a href="subjects.html"><i class="fas fa-book"></i> Manage Subjects</a></li> <!-- New -->
+            <li><a href="college-details.html"><i class="fas fa-building"></i> College Details</a></li>
+            <li><a href="../login.html"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+        </ul>
+    </nav>
+    <main class="main-content">
+    <div class="container">
+        <h2><i class="fas fa-book"></i> Manage Subjects</h2>
+        <form id="subjectForm">
+            <div class="form-group">
+                <label for="classId">Select Class</label>
+                <select id="classId" required>
+                    <option value="">Choose a class</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="subject">Subject Name</label>
+                <input type="text" id="subject" required>
+            </div>
+            <div class="form-group">
+                <label for="faculty">Faculty (Teacher Name)</label>
+                <input type="text" id="faculty" required>
+            </div>
+            <div class="form-group">
+                <label for="hours">Hours per Week</label>
+                <input type="number" id="hours" min="1" max="10" required>
+            </div>
+            <button type="submit" id="addBtn">Add Subject</button>
+            <button type="button" id="editBtn" style="display:none;">Update Subject</button>
+            <button type="button" onclick="clearForm()">Clear</button>
+        </form>
+        
+        <div class="loader" id="loader">
+            <i class="fas fa-spinner"></i>
+            <p>Loading...</p>
+        </div>
+        
+        <div id="successMsg" class="success" style="display: none;"></div>
+        <div id="errorMsg" class="error" style="display: none;"></div>
+        
+        <div id="subjectsTable">
+            <h3>Subjects for Selected Class</h3>
+            <table>
+                <thead>
+                    <tr><th>Subject</th><th>Faculty</th><th>Hours/Week</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+    </main>
+
+    <script>
+        const API = "http://127.0.0.1:8000";
+        const form = document.getElementById('subjectForm');
+        const classSelect = document.getElementById('classId');
+        const loader = document.getElementById('loader');
+        const successMsg = document.getElementById('successMsg');
+        const errorMsg = document.getElementById('errorMsg');
+        const tableBody = document.getElementById('tableBody');
+        const addBtn = document.getElementById('addBtn');
+        const editBtn = document.getElementById('editBtn');
+        let editingId = null;
+
+        // Utils
+        function showMessage(el, msg) {
+            el.innerHTML = msg || '';
+            el.style.display = 'block';
+            [successMsg, errorMsg].forEach(m => m !== el ? m.style.display = 'none' : null);
+            setTimeout(() => el.style.display = 'none', 5000);
+        }
+
+        function clearForm() {
+            form.reset();
+            editingId = null;
+            addBtn.style.display = 'inline-block';
+            editBtn.style.display = 'none';
+            loadSubjects();
+        }
+
+        // Load Classes
+        async function loadClasses() {
+            try {
+                const res = await fetch(`${API}/classes`);
+                const classes = await res.json();
+                classSelect.innerHTML = '<option value="">Choose a class</option>';
+                classes.forEach(cls => {
+                    if (cls.classId) {
+                        const opt = document.createElement('option');
+                        opt.value = cls.classId;
+                        opt.textContent = cls.classId;
+                        classSelect.appendChild(opt);
+                    }
+                });
+            } catch (err) {
+                showMessage(errorMsg, `Error loading classes: ${err.message}`);
+            }
+        }
+
+        // Load Subjects for Class
+        async function loadSubjects(classId = classSelect.value) {
+            if (!classId) return;
+            loader.style.display = 'block';
+            tableBody.innerHTML = '';
+            try {
+                const res = await fetch(`${API}/subjects/${encodeURIComponent(classId)}`);
+                const subjects = await res.json();
+                subjects.forEach(sub => {
+                    const row = tableBody.insertRow();
+                    row.innerHTML = `
+                        <td>${sub.subject}</td>
+                        <td>${sub.faculty}</td>
+                        <td>${sub.hours_per_week}</td>
+                        <td>
+                            <button onclick="editSubject('${sub._id}')">Edit</button>
+                            <button class="delete" onclick="deleteSubject('${sub._id}')">Delete</button>
+                        </td>
+                    `;
+                });
+                if (subjects.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="4">No subjects yet. Add some!</td></tr>';
+                }
+            } catch (err) {
+                showMessage(errorMsg, `Error loading subjects: ${err.message}`);
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        // Add/Update Subject
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                subject: document.getElementById('subject').value,
+                faculty: document.getElementById('faculty').value,
+                hours_per_week: parseInt(document.getElementById('hours').value),
+                classId: classSelect.value
+            };
+            loader.style.display = 'block';
+            try {
+                const url = editingId ? `${API}/subjects/${editingId}` : `${API}/subjects`;
+                const method = editingId ? 'PUT' : 'POST';
+                const res = await fetch(url, {
+                    method,
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    showMessage(successMsg, editingId ? 'Subject updated!' : 'Subject added!');
+                    clearForm();
+                } else {
+                    const err = await res.json();
+                    showMessage(errorMsg, `Error: ${err.detail}`);
+                }
+            } catch (err) {
+                showMessage(errorMsg, `Request failed: ${err.message}`);
+            } finally {
+                loader.style.display = 'none';
+            }
+        });
+
+        // Edit Subject
+        function editSubject(id) {
+            editingId = id;
+            // Fetch and populate form (simplified; add fetch if needed)
+            addBtn.style.display = 'none';
+            editBtn.style.display = 'inline-block';
+            // TODO: Fetch single subject and fill form
+            alert('Edit mode: Update form and click Update. (Add fetch for auto-fill if needed.)');
+        }
+
+        // Delete Subject
+        async function deleteSubject(id) {
+            if (!confirm('Delete this subject?')) return;
+            try {
+                const res = await fetch(`${API}/subjects/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    showMessage(successMsg, 'Subject deleted!');
+                    loadSubjects();
+                } else {
+                    const err = await res.json();
+                    showMessage(errorMsg, `Error: ${err.detail}`);
+                }
+            } catch (err) {
+                showMessage(errorMsg, `Delete failed: ${err.message}`);
+            }
+        }
+
+        // Events
+        classSelect.addEventListener('change', loadSubjects);
+
+        // Init
+        loadClasses();
+    </script>
+</body>
+</html>

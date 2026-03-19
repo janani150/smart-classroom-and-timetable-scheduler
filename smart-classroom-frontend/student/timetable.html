@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Timetable</title>
+    <link rel="stylesheet" href="../css/shared.css">
+    <style>
+        /* ===== Student Timetable Table Styling ===== */
+
+.timetable-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.timetable-table thead {
+  background: #5b5fc7;
+  color: white;
+}
+
+.timetable-table th,
+.timetable-table td {
+  border: 1px solid #ddd;
+  padding: 12px 10px;
+  text-align: center;
+  font-size: 14px;
+  min-width: 120px;
+}
+
+.timetable-table th {
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.timetable-table td h4 {
+  margin: 0;
+  font-weight: 600;
+  color: #333;
+}
+
+.timetable-table tbody tr:nth-child(even) {
+  background-color: #f7f7ff;
+}
+
+.timetable-table tbody tr:hover {
+  background-color: #eef0ff;
+}
+
+/* Subject + Faculty formatting */
+.timetable-table td {
+  line-height: 1.4;
+  white-space: normal;
+}
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="page-title">Your Class Timetable</h1>
+        <div class="timetable-wrapper">
+            <table class="timetable-table">
+                <thead>
+                    <tr>
+                        <th>Day</th>
+                        <th>Period 1</th>
+                        <th>Period 2</th>
+                        <th>Period 3</th>
+                        <th>Period 4</th>
+                        <th>Period 5</th>
+                        <th>Period 6</th>
+                    </tr>
+                </thead>
+                <tbody id="timetable-body">
+                    <tr><td colspan="7" class="loading">Loading your timetable...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function loadStudentTimetable() {
+            // Get from localStorage instead of hardcode
+            const studentClassId = localStorage.getItem("classId");
+            const studentName = localStorage.getItem("studentName") || "Student";
+
+            if (!studentClassId) {
+                document.getElementById("timetable-body").innerHTML =
+                    `<tr><td colspan="7">No class info found. <a href="/login">Login again</a> to view your timetable.</td></tr>`;
+                document.getElementById("page-title").textContent = `${studentName}'s Timetable`;
+                return;
+            }
+
+            document.getElementById("page-title").textContent = `${studentName}'s Timetable`;
+
+            try {
+                const res = await fetch(
+                    `http://localhost:8000/student/timetable?classId=${encodeURIComponent(studentClassId)}`  // Encode for safety
+                );
+
+                const data = await res.json();
+
+                if (data.message) {
+                    document.getElementById("timetable-body").innerHTML =
+                        `<tr><td colspan="7">${data.message}. Contact admin if needed.</td></tr>`;
+                    return;
+                }
+
+                renderTimetable(data.schedule);
+            } catch (err) {
+                console.error(err);
+                document.getElementById("timetable-body").innerHTML =
+                    `<tr><td colspan="7">Error loading timetable. <button onclick="loadStudentTimetable()">Retry</button></td></tr>`;
+            }
+        }
+
+        function renderTimetable(schedule) {
+            const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+            const tbody = document.getElementById("timetable-body");
+            tbody.innerHTML = "";
+
+            days.forEach(day => {
+                const row = document.createElement("tr");
+                row.innerHTML = `<td><h4>${day}</h4></td>`;
+
+                for (let i = 1; i <= 6; i++) {
+                    const key = `${day}-P${i}`;
+                    const cell = schedule[key]
+                        ? schedule[key].subject  // Extend later: + `<br><small>${schedule[key].faculty || ''}</small>`
+                        : "Free";
+                    row.innerHTML += `<td>${cell}</td>`;
+                }
+
+                tbody.appendChild(row);
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", loadStudentTimetable);
+    </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+bcrypt==3.2.2
+cffi==2.0.0
+dnspython==2.8.0
+email-validator==2.3.0
+idna==3.11
+passlib==1.7.4
+pycparser==2.23
+pymongo==4.15.5
+python-dotenv==1.2.1
+PyJWT==2.10.1

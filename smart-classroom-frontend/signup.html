@@ -1,0 +1,53 @@
+<!-- signup.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup - Smart Classroom Timetable</title>
+    <link rel="stylesheet" href="css/shared.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="auth-body">
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <i class="fas fa-user-plus"></i>
+                <h2>Create Your Account</h2>
+            </div>
+            <form id="signupForm">
+    <input type="text" id="name" placeholder="Name" required />
+    <input type="email" id="email" placeholder="Email" required />
+    <input type="password" id="password" placeholder="Password" required />
+
+    <select id="role" required>
+        <option value="">Select role</option>
+        <option value="student">Student</option>
+        <option value="teacher">Teacher</option>
+        <option value="admin">Admin</option>
+    </select>
+
+    <input type="text" id="department" placeholder="Department" required />
+    <!-- Student only -->
+<input type="number" id="year" placeholder="Year" style="display:none;" />
+
+<select id="section" style="display:none;">
+    <option value="">Select Section</option>
+    <option value="A">Section A</option>
+    <option value="B">Section B</option>
+    <option value="C">Section C</option>
+</select>
+
+
+    <!-- Student only -->
+    <input type="number" id="year" placeholder="Year" style="display:none;" />
+
+    <button type="submit">Sign Up</button>
+</form>
+            <p class="auth-link">Already have an account? <a href="login.html">Login here</a></p>
+        </div>
+    </div>
+    <script src="js/signup.js"></script>
+</body>
+</html>

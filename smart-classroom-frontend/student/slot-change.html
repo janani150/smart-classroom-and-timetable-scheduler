@@ -1,0 +1,64 @@
+<!-- student/slot-change.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot Change - Smart Classroom Timetable</title>
+    <link rel="stylesheet" href="C:\Users\Janan\OneDrive\Desktop\vac sih project\smart-classroom-frontend\css\shared.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-user-graduate"></i>
+            <span>Student Dashboard</span>
+        </div>
+        <ul class="sidebar-menu">
+            <li><a href="dashboard.html"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+            <li><a href="timetable.html"><i class="fas fa-calendar-alt"></i> Timetable</a></li>
+            <li><a href="upcoming-classes.html"><i class="fas fa-clock"></i> Upcoming Classes</a></li>
+            <li><a href="slot-change.html"><i class="fas fa-exchange-alt"></i> Slot Change</a></li>
+            <li><a href="notification.html"><i class="fas fa-bell"></i> Notifications</a></li>
+            <li><a href="C:\Users\Janan\OneDrive\Desktop\vac sih project\smart-classroom-frontend\login.html"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+        </ul>
+    </nav>
+    <main class="main-content">
+        <header class="page-header">
+            <h1>Slot Change Requests</h1>
+            <p>Request schedule adjustments.</p>
+        </header>
+        <div class="container">
+            <form class="request-form">
+                <div class="form-group">
+                    <label for="current-slot">Current Slot</label>
+                    <select id="current-slot" class="form-select">
+                        <option>Math 10:00 AM</option>
+                        <!-- Options -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="new-slot">Preferred New Slot</label>
+                    <select id="new-slot" class="form-select">
+                        <option>Physics 11:00 AM</option>
+                        <!-- Options -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="reason">Reason</label>
+                    <textarea id="reason" placeholder="Explain your request"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Submit Request</button>
+            </form>
+        </div>
+    </main>
+    <script src="C:\Users\Janan\OneDrive\Desktop\vac sih project\smart-classroom-frontend\js\shared.js"></script>
+    <script>
+        document.querySelector('.request-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            alert('Request submitted!');
+        });
+    </script>
+</body>
+</html>
