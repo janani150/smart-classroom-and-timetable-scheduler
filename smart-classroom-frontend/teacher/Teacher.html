@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Classroom · Teacher</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="teacher.css">
+</head>
+<body>
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon"><i class="fas fa-chalkboard-teacher"></i></div>
+    <div class="brand-text">
+      <span class="brand-name">SmartClass</span>
+      <span class="brand-role">Teacher Portal</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a class="nav-item" data-view="dashboard">
+      <i class="fas fa-th-large"></i><span>Dashboard</span>
+    </a>
+    <a class="nav-item" data-view="timetable">
+      <i class="fas fa-calendar-alt"></i><span>My Timetable</span>
+    </a>
+    <a class="nav-item" data-view="attendance">
+      <i class="fas fa-clipboard-check"></i><span>Attendance</span>
+    </a>
+    <a class="nav-item" data-view="classes">
+      <i class="fas fa-book-open"></i><span>Available Classes</span>
+    </a>
+    <a class="nav-item" data-view="profile">
+      <i class="fas fa-user-circle"></i><span>My Profile</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-chip">
+      <div class="user-avatar" id="userAvatar">T</div>
+      <div class="user-info">
+        <span class="user-name"  id="sidebarName">Teacher</span>
+        <span class="user-email" id="sidebarEmail">—</span>
+      </div>
+    </div>
+    <button class="logout-btn" onclick="App.logout()" title="Logout">
+      <i class="fas fa-sign-out-alt"></i>
+    </button>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<div class="main-wrap">
+  <header class="topbar">
+    <button class="menu-toggle" onclick="App.toggleSidebar()">
+      <i class="fas fa-bars"></i>
+    </button>
+    <div class="topbar-title" id="topbarTitle">Dashboard</div>
+    <div class="topbar-right">
+      <div class="topbar-dept" id="topbarDept"></div>
+    </div>
+  </header>
+
+  <main class="view-container" id="viewContainer">
+    <div class="page-loading"><div class="loader-ring"></div></div>
+  </main>
+</div>
+
+<!-- ── TOAST ── -->
+<div class="toast-stack" id="toastStack"></div>
+
+<script src="teacher.js"></script>
+</body>
+</html>

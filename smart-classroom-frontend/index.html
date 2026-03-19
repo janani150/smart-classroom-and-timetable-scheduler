@@ -1,60 +1,245 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Classroom Timetable - Welcome</title>
-    <link rel="stylesheet" href="css/shared.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Classroom — Welcome</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --accent: #4f46e5;
+      --accent-dk: #3730a3;
+      --text: #1e1b4b;
+      --muted: #6b7280;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; color: var(--text); overflow-x: hidden; }
+    a { text-decoration: none; color: inherit; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #2563eb 100%);
+      display: flex; flex-direction: column;
+      position: relative; overflow: hidden;
+    }
+    .hero::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+
+    /* Navbar */
+    .navbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 22px 60px; position: relative; z-index: 2;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-size: 18px; font-weight: 700; }
+    .nav-brand i { font-size: 22px; }
+    .nav-links { display: flex; gap: 10px; }
+    .nav-btn {
+      padding: 9px 22px; border-radius: 8px; font-size: 14px; font-weight: 600;
+      cursor: pointer; border: none; font-family: inherit; transition: all .2s;
+    }
+    .nav-btn-ghost { background: rgba(255,255,255,.12); color: #fff; }
+    .nav-btn-ghost:hover { background: rgba(255,255,255,.22); }
+    .nav-btn-solid { background: #fff; color: var(--accent); }
+    .nav-btn-solid:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.15); }
+
+    /* Hero content */
+    .hero-body {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 40px 24px; position: relative; z-index: 2;
+    }
+    .hero-inner { max-width: 720px; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: rgba(255,255,255,.15); color: #fff;
+      border-radius: 20px; padding: 5px 16px; font-size: 13px; font-weight: 600;
+      margin-bottom: 26px; backdrop-filter: blur(6px);
+    }
+    .hero-title {
+      font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 700; color: #fff;
+      line-height: 1.18; margin-bottom: 20px;
+    }
+    .hero-title span { opacity: .85; }
+    .hero-sub { font-size: 18px; color: rgba(255,255,255,.78); margin-bottom: 38px; line-height: 1.6; }
+    .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .cta-primary {
+      padding: 14px 32px; background: #fff; color: var(--accent);
+      border-radius: 10px; font-size: 15px; font-weight: 700;
+      transition: transform .2s, box-shadow .2s; display: inline-flex; align-items: center; gap: 8px;
+    }
+    .cta-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,0,0,.2); }
+    .cta-ghost {
+      padding: 14px 32px; background: rgba(255,255,255,.14); color: #fff;
+      border-radius: 10px; font-size: 15px; font-weight: 600;
+      border: 1.5px solid rgba(255,255,255,.35);
+      transition: background .2s; display: inline-flex; align-items: center; gap: 8px;
+    }
+    .cta-ghost:hover { background: rgba(255,255,255,.22); }
+
+    /* Scroll indicator */
+    .scroll-hint { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,.45); font-size: 13px; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    .scroll-hint i { animation: bounce 1.6s infinite; }
+    @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(6px)} }
+
+    /* ── FEATURES ── */
+    .features { padding: 90px 24px; background: #f9fafb; }
+    .section-label { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+    .section-title { text-align: center; font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 700; color: var(--text); margin-bottom: 12px; }
+    .section-sub   { text-align: center; font-size: 16px; color: var(--muted); margin-bottom: 56px; max-width: 520px; margin-left: auto; margin-right: auto; }
+    .feat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 1100px; margin: 0 auto; }
+    .feat-card {
+      background: #fff; border-radius: 16px; padding: 32px 28px;
+      border: 1px solid #e5e7eb; transition: transform .2s, box-shadow .2s;
+    }
+    .feat-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(79,70,229,.1); }
+    .feat-icon { width: 52px; height: 52px; border-radius: 12px; background: #eef2ff; display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--accent); margin-bottom: 18px; }
+    .feat-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 9px; }
+    .feat-card p  { font-size: 14px; color: var(--muted); line-height: 1.65; }
+
+    /* ── ROLES ── */
+    .roles { padding: 80px 24px; background: #fff; }
+    .roles-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; max-width: 900px; margin: 0 auto; }
+    .role-card {
+      border-radius: 14px; padding: 28px 24px; text-align: center;
+      cursor: pointer; transition: transform .2s, box-shadow .2s;
+      border: 2px solid transparent;
+    }
+    .role-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,.1); }
+    .role-card.admin   { background: #eef2ff; border-color: #c7d2fe; }
+    .role-card.teacher { background: #f0fdf4; border-color: #bbf7d0; }
+    .role-card.student { background: #fefce8; border-color: #fde68a; }
+    .role-icon { font-size: 36px; margin-bottom: 14px; }
+    .role-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .role-card p  { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+    .role-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 700;
+      transition: opacity .15s;
+    }
+    .role-link:hover { opacity: .82; }
+    .role-card.admin   .role-link { background: var(--accent); color: #fff; }
+    .role-card.teacher .role-link { background: #16a34a; color: #fff; }
+    .role-card.student .role-link { background: #d97706; color: #fff; }
+
+    /* ── FOOTER ── */
+    footer { background: #1e1b4b; color: rgba(255,255,255,.55); text-align: center; padding: 28px 24px; font-size: 13.5px; }
+    footer strong { color: rgba(255,255,255,.82); }
+
+    @media (max-width:600px) {
+      .navbar { padding: 18px 22px; }
+      .hero-title { font-size: 2rem; }
+      .hero-sub { font-size: 16px; }
+    }
+  </style>
 </head>
 <body>
-    <header class="hero-header">
-        <nav class="navbar">
-            <div class="nav-brand">
-                <i class="fas fa-graduation-cap"></i>
-                <span>Smart Classroom</span>
-            </div>
-            <ul class="nav-links">
-                <li><a href="login.html">Login</a></li>
-                <li><a href="signup.html">Signup</a></li>
-            </ul>
-        </nav>
-        <div class="hero-content">
-            <h1 class="hero-title">Revolutionize Your Classroom Experience</h1>
-            <p class="hero-subtitle">Seamless timetables, attendance, and notifications at your fingertips.</p>
-            <div class="hero-buttons">
-                <a href="login.html" class="btn btn-primary">Get Started</a>
-                <a href="signup.html" class="btn btn-secondary">Create Account</a>
-            </div>
-        </div>
-    </header>
-    <section class="features">
-        <div class="container">
-            <h2>Why Choose Us?</h2>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <i class="fas fa-calendar-alt"></i>
-                    <h3>Dynamic Timetables</h3>
-                    <p>Real-time updates and easy navigation for students and teachers.</p>
-                </div>
-                <div class="feature-card">
-                    <i class="fas fa-users"></i>
-                    <h3>Attendance Tracking</h3>
-                    <p>Effortless check-ins with QR codes and notifications.</p>
-                </div>
-                <div class="feature-card">
-                    <i class="fas fa-bell"></i>
-                    <h3>Instant Notifications</h3>
-                    <p>Stay ahead with class changes and reminders.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-    <footer class="footer">
-        <p>&copy; 2025 Smart Classroom Timetable. All rights reserved.</p>
-    </footer>
-    <script src="js/shared.js"></script>
+
+<!-- ── HERO ── -->
+<section class="hero">
+  <nav class="navbar">
+    <div class="nav-brand">
+      <i class="fas fa-graduation-cap"></i>
+      <span>SmartClassroom</span>
+    </div>
+    <div class="nav-links">
+      <button class="nav-btn nav-btn-ghost" onclick="location.href='login.html'">Login</button>
+      <button class="nav-btn nav-btn-solid" onclick="location.href='signup.html'">Sign Up</button>
+    </div>
+  </nav>
+
+  <div class="hero-body">
+    <div class="hero-inner">
+      <div class="hero-badge"><i class="fas fa-bolt"></i> Smart · Fast · Conflict-free</div>
+      <h1 class="hero-title">The classroom management<br><span>platform built for everyone</span></h1>
+      <p class="hero-sub">Auto-generate clash-free timetables, track attendance, manage classes and notify students — all from one place.</p>
+      <div class="hero-cta">
+        <a href="login.html"  class="cta-primary"><i class="fas fa-sign-in-alt"></i> Get Started</a>
+        <a href="signup.html" class="cta-ghost"><i class="fas fa-user-plus"></i> Create Account</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="scroll-hint">
+    <span>Scroll to explore</span>
+    <i class="fas fa-chevron-down"></i>
+  </div>
+</section>
+
+<!-- ── FEATURES ── -->
+<section class="features">
+  <div class="section-label">Features</div>
+  <h2 class="section-title">Everything you need, nothing you don't</h2>
+  <p class="section-sub">From auto-scheduling to live attendance — the full toolset for a modern college.</p>
+
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-icon"><i class="fas fa-magic"></i></div>
+      <h3>Auto Timetable Generation</h3>
+      <p>Set subjects, faculty and constraints once — the engine generates a clash-free schedule in seconds.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon"><i class="fas fa-clipboard-check"></i></div>
+      <h3>Attendance Tracking</h3>
+      <p>Teachers mark attendance per class period. Students and admins see live reports with rate percentages.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon"><i class="fas fa-bell"></i></div>
+      <h3>Instant Notifications</h3>
+      <p>Slot changes, timetable updates and announcements are pushed directly to students and teachers.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon"><i class="fas fa-exchange-alt"></i></div>
+      <h3>Slot Change Requests</h3>
+      <p>Students and teachers request swaps through the app. Admins approve or reject with one click.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon"><i class="fas fa-users-cog"></i></div>
+      <h3>Role-based Access</h3>
+      <p>Admins, teachers and students each have their own tailored portal — no clutter, no confusion.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon"><i class="fas fa-layer-group"></i></div>
+      <h3>Department Management</h3>
+      <p>Manage departments, classes, sections, subjects and teacher assignments from a single admin panel.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── ROLES ── -->
+<section class="roles">
+  <div class="section-label">Portals</div>
+  <h2 class="section-title">Pick your role to get started</h2>
+  <p class="section-sub">Each portal is purpose-built. Login once and land exactly where you need to be.</p>
+  <div class="roles-grid">
+    <div class="role-card admin">
+      <div class="role-icon">🛡️</div>
+      <h3>Admin</h3>
+      <p>Generate timetables, manage college, departments, teachers and classes.</p>
+      <a href="login.html" class="role-link"><i class="fas fa-arrow-right"></i> Admin Login</a>
+    </div>
+    <div class="role-card teacher">
+      <div class="role-icon">📋</div>
+      <h3>Teacher</h3>
+      <p>View your weekly schedule, mark attendance and browse available classes.</p>
+      <a href="login.html" class="role-link"><i class="fas fa-arrow-right"></i> Teacher Login</a>
+    </div>
+    <div class="role-card student">
+      <div class="role-icon">🎓</div>
+      <h3>Student</h3>
+      <p>Check your timetable, see upcoming classes and request slot changes.</p>
+      <a href="login.html" class="role-link"><i class="fas fa-arrow-right"></i> Student Login</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <strong>SmartClassroom</strong> &nbsp;·&nbsp; © 2025 All rights reserved.
+</footer>
+
 </body>
 </html>

@@ -1,23 +1,47 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import router  # Or wherever your router lives
+import logging
 
-app = FastAPI(title="Smart Classroom API")
+from app.routes import router
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(
+    title="Smart Classroom API",
+    version="1.0.0",
+    description="Backend API for the Smart Classroom management system",
+)
+
+# ─── CORS ────────────────────────────────────────────────────────────────────
+# Tighten allow_origins in production – replace "*" with your frontend domain.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # "*" catches "null" too in most browsers; drop explicit "null" if not needed
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(router)
+# ─── Routers ─────────────────────────────────────────────────────────────────
+app.include_router(router, prefix="/api")
 
+# ─── Health check ────────────────────────────────────────────────────────────
 @app.get("/")
-async def root():  # Add 'async' for consistency (optional)
-    return {"message": "Backend is running 🚀"}
+def root():
+    return {"message": "Smart Classroom API is running 🚀"}
 
+
+@app.get("/health")
+def health():
+    """Lightweight liveness probe for deployment platforms."""
+    return {"status": "ok"}
+
+
+# ─── Entrypoint (dev only) ───────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

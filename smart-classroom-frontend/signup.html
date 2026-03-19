@@ -1,53 +1,251 @@
-<!-- signup.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Signup - Smart Classroom Timetable</title>
-    <link rel="stylesheet" href="css/shared.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up — Smart Classroom</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root { --accent:#4f46e5; --success:#16a34a; --danger:#ef4444; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 60%, #2563eb 100%);
+      padding: 24px 20px;
+    }
+    .card {
+      background: #fff; border-radius: 18px; padding: 38px 36px;
+      width: 100%; max-width: 440px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.18);
+    }
+    .logo { display:flex;align-items:center;gap:9px;justify-content:center;margin-bottom:26px; }
+    .logo-icon { width:40px;height:40px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff; }
+    .logo-name { font-size:16px;font-weight:700;color:#1e1b4b; }
+    h2  { font-size:22px;font-weight:700;color:#1e1b4b;margin-bottom:4px; }
+    .sub{ font-size:13.5px;color:#6b7280;margin-bottom:24px; }
+
+    .role-group { display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px; }
+    .role-pill input { display:none; }
+    .role-pill label {
+      display:flex;flex-direction:column;align-items:center;gap:4px;
+      padding:10px 4px; border-radius:9px;
+      border:1.5px solid #e5e7eb; background:#f9fafb;
+      cursor:pointer; font-size:11px; font-weight:700;
+      color:#6b7280; transition:all .15s; text-transform:uppercase; letter-spacing:.03em;
+    }
+    .role-pill label i { font-size:18px; }
+    .role-pill input:checked + label { border-color:var(--accent); background:#eef2ff; color:var(--accent); }
+
+    .form-grid { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+    .fg { display:flex;flex-direction:column;gap:5px;margin-bottom:0; }
+    .fg.full { grid-column:1/-1; }
+    label { font-size:11.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em; }
+    .iw { position:relative; }
+    .iw i { position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:13px; }
+    input, select {
+      width:100%; padding:9px 12px 9px 36px;
+      border:1.5px solid #e5e7eb; border-radius:8px;
+      font-size:13.5px; color:#1e1b4b; background:#f9fafb;
+      outline:none; font-family:inherit;
+      transition:border-color .18s, box-shadow .18s;
+    }
+    input:focus, select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,70,229,.1); background:#fff; }
+
+    /* Student-only fields hidden by default */
+    .student-only { display:none; }
+
+    .divider { height:1px;background:#f3f4f6;margin:16px 0; }
+
+    .err-box { background:#fee2e2;color:#991b1b;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px;display:none;align-items:center;gap:8px; }
+    .ok-box  { background:#d1fae5;color:#065f46;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px;display:none;align-items:center;gap:8px; }
+
+    .btn-submit {
+      width:100%; padding:12px; border-radius:10px;
+      background:var(--accent); color:#fff;
+      font-size:15px; font-weight:700; border:none; cursor:pointer;
+      font-family:inherit; margin-top:14px;
+      transition:opacity .15s, transform .1s, box-shadow .15s;
+    }
+    .btn-submit:hover:not(:disabled) { opacity:.88; transform:translateY(-1px); box-shadow:0 8px 22px rgba(79,70,229,.35); }
+    .btn-submit:disabled { opacity:.5; cursor:not-allowed; }
+
+    .foot { text-align:center;margin-top:18px;font-size:13.5px;color:#6b7280; }
+    .foot a { color:var(--accent);font-weight:600;text-decoration:none; }
+    .foot a:hover { text-decoration:underline; }
+    .back-link { display:flex;align-items:center;gap:6px;font-size:13px;color:rgba(255,255,255,.7);margin-bottom:14px;cursor:pointer;width:fit-content;margin-left:auto;margin-right:auto; }
+    .back-link:hover { color:#fff; }
+  </style>
 </head>
-<body class="auth-body">
-    <div class="auth-container">
-        <div class="auth-card">
-            <div class="auth-header">
-                <i class="fas fa-user-plus"></i>
-                <h2>Create Your Account</h2>
-            </div>
-            <form id="signupForm">
-    <input type="text" id="name" placeholder="Name" required />
-    <input type="email" id="email" placeholder="Email" required />
-    <input type="password" id="password" placeholder="Password" required />
+<body>
 
-    <select id="role" required>
-        <option value="">Select role</option>
-        <option value="student">Student</option>
-        <option value="teacher">Teacher</option>
-        <option value="admin">Admin</option>
-    </select>
-
-    <input type="text" id="department" placeholder="Department" required />
-    <!-- Student only -->
-<input type="number" id="year" placeholder="Year" style="display:none;" />
-
-<select id="section" style="display:none;">
-    <option value="">Select Section</option>
-    <option value="A">Section A</option>
-    <option value="B">Section B</option>
-    <option value="C">Section C</option>
-</select>
-
-
-    <!-- Student only -->
-    <input type="number" id="year" placeholder="Year" style="display:none;" />
-
-    <button type="submit">Sign Up</button>
-</form>
-            <p class="auth-link">Already have an account? <a href="login.html">Login here</a></p>
-        </div>
+<div style="width:100%;max-width:440px;">
+  <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to home</a>
+  <div class="card">
+    <div class="logo">
+      <div class="logo-icon"><i class="fas fa-graduation-cap"></i></div>
+      <span class="logo-name">SmartClassroom</span>
     </div>
-    <script src="js/signup.js"></script>
+    <h2>Create account</h2>
+    <p class="sub">Fill in the details below to get started.</p>
+
+    <div id="errBox" class="err-box"><i class="fas fa-exclamation-circle"></i><span id="errMsg"></span></div>
+    <div id="okBox"  class="ok-box"><i class="fas fa-check-circle"></i><span id="okMsg"></span></div>
+
+    <form id="signupForm">
+      <!-- Role -->
+      <div style="margin-bottom:14px;">
+        <label style="display:block;margin-bottom:8px;">I am a</label>
+        <div class="role-group">
+          <div class="role-pill">
+            <input type="radio" name="role" id="rAdmin" value="admin">
+            <label for="rAdmin"><i class="fas fa-user-shield"></i>Admin</label>
+          </div>
+          <div class="role-pill">
+            <input type="radio" name="role" id="rTeacher" value="teacher">
+            <label for="rTeacher"><i class="fas fa-chalkboard-teacher"></i>Teacher</label>
+          </div>
+          <div class="role-pill">
+            <input type="radio" name="role" id="rStudent" value="student">
+            <label for="rStudent"><i class="fas fa-user-graduate"></i>Student</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="fg full">
+          <label>Full Name</label>
+          <div class="iw"><i class="fas fa-user"></i><input type="text" id="name" placeholder="Your full name" required></div>
+        </div>
+
+        <div class="fg full">
+          <label>Email</label>
+          <div class="iw"><i class="fas fa-envelope"></i><input type="email" id="email" placeholder="you@example.com" required></div>
+        </div>
+
+        <div class="fg full">
+          <label>Password</label>
+          <div class="iw"><i class="fas fa-lock"></i><input type="password" id="password" placeholder="Minimum 6 characters" required minlength="6"></div>
+        </div>
+
+        <div class="fg full">
+          <label>Department</label>
+          <div class="iw"><i class="fas fa-layer-group"></i><input type="text" id="department" placeholder="e.g. Computer Science" required></div>
+        </div>
+
+        <!-- Student-only fields -->
+        <div class="fg student-only" id="yearField">
+          <label>Year</label>
+          <div class="iw"><i class="fas fa-calendar"></i>
+            <select id="year">
+              <option value="">Year</option>
+              <option value="1">Year 1</option>
+              <option value="2">Year 2</option>
+              <option value="3">Year 3</option>
+              <option value="4">Year 4</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="fg student-only" id="sectionField">
+          <label>Section</label>
+          <div class="iw"><i class="fas fa-bookmark"></i>
+            <select id="section">
+              <option value="">Section</option>
+              <option value="A">Section A</option>
+              <option value="B">Section B</option>
+              <option value="C">Section C</option>
+              <option value="D">Section D</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit" id="submitBtn">
+        <span id="btnText"><i class="fas fa-user-plus"></i> Create Account</span>
+      </button>
+    </form>
+
+    <div class="foot">Already have an account? <a href="login.html">Sign in</a></div>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:8000/api';
+
+  // Show / hide student fields based on role
+  document.querySelectorAll('input[name="role"]').forEach(rb => {
+    rb.addEventListener('change', () => {
+      const isStudent = rb.value === 'student';
+      document.querySelectorAll('.student-only').forEach(el => {
+        el.style.display = isStudent ? 'flex' : 'none';
+        el.querySelectorAll('select,input').forEach(f => f.required = isStudent);
+      });
+    });
+  });
+
+  function showErr(msg) {
+    const b = document.getElementById('errBox');
+    document.getElementById('errMsg').textContent = msg;
+    b.style.display = 'flex';
+    document.getElementById('okBox').style.display = 'none';
+  }
+  function showOk(msg) {
+    const b = document.getElementById('okBox');
+    document.getElementById('okMsg').textContent = msg;
+    b.style.display = 'flex';
+    document.getElementById('errBox').style.display = 'none';
+  }
+
+  document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    document.getElementById('errBox').style.display = 'none';
+
+    const role = document.querySelector('input[name="role"]:checked')?.value;
+    if (!role) return showErr('Please select your role.');
+
+    const btn     = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+
+    const payload = {
+      name:       document.getElementById('name').value.trim(),
+      email:      document.getElementById('email').value.trim(),
+      password:   document.getElementById('password').value,
+      role,
+      department: document.getElementById('department').value.trim(),
+    };
+
+    if (role === 'student') {
+      const year    = document.getElementById('year').value;
+      const section = document.getElementById('section').value;
+      if (!year || !section) return showErr('Please select Year and Section.');
+      payload.year    = parseInt(year);
+      payload.section = section;
+    }
+
+    btn.disabled = true;
+    btnText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account…';
+
+    try {
+      const res  = await fetch(`${API}/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) return showErr(data.detail || 'Signup failed. Try a different email.');
+
+      showOk('Account created! Redirecting to login…');
+      setTimeout(() => window.location.href = 'login.html', 1600);
+    } catch {
+      showErr('Cannot reach the server. Is the backend running?');
+    } finally {
+      btn.disabled = false;
+      btnText.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+    }
+  });
+</script>
 </body>
 </html>

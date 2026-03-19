@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Classroom · Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon"><i class="fas fa-graduation-cap"></i></div>
+    <div class="brand-text">
+      <span class="brand-name">SmartClass</span>
+      <span class="brand-role">Admin Panel</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a class="nav-item" data-view="dashboard">
+      <i class="fas fa-th-large"></i><span>Dashboard</span>
+    </a>
+    <a class="nav-item" data-view="college">
+      <i class="fas fa-building"></i><span>College Details</span>
+    </a>
+    <a class="nav-item" data-view="subjects">
+      <i class="fas fa-book-open"></i><span>Subjects</span>
+    </a>
+    <a class="nav-item" data-view="rules">
+      <i class="fas fa-sliders-h"></i><span>Timetable Rules</span>
+    </a>
+    <a class="nav-item" data-view="generate">
+      <i class="fas fa-magic"></i><span>Generate Timetable</span>
+    </a>
+    <a class="nav-item" data-view="viewer">
+      <i class="fas fa-table"></i><span>Timetable Viewer</span>
+    </a>
+    <a class="nav-item" data-view="attendance">
+      <i class="fas fa-chart-bar"></i><span>Attendance</span>
+    </a>
+    <a class="nav-item" data-view="slotchange">
+      <i class="fas fa-exchange-alt"></i><span>Slot Changes</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-chip" id="userChip">
+      <div class="user-avatar" id="userAvatar">A</div>
+      <div class="user-info">
+        <span class="user-name" id="sidebarName">Admin</span>
+        <span class="user-email" id="sidebarEmail">—</span>
+      </div>
+    </div>
+    <button class="logout-btn" onclick="App.logout()">
+      <i class="fas fa-sign-out-alt"></i>
+    </button>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<div class="main-wrap">
+  <!-- Top bar -->
+  <header class="topbar">
+    <button class="menu-toggle" onclick="App.toggleSidebar()">
+      <i class="fas fa-bars"></i>
+    </button>
+    <div class="topbar-title" id="topbarTitle">Dashboard</div>
+    <div class="topbar-right">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" placeholder="Search…" id="globalSearch">
+      </div>
+    </div>
+  </header>
+
+  <!-- View container -->
+  <main class="view-container" id="viewContainer">
+    <div class="page-loading" id="pageLoading">
+      <div class="loader-ring"></div>
+    </div>
+  </main>
+</div>
+
+<!-- ── TOAST ── -->
+<div class="toast-stack" id="toastStack"></div>
+
+<!-- ── MODAL ── -->
+<div class="modal-overlay" id="modalOverlay" onclick="App.closeModal()">
+  <div class="modal-box" id="modalBox" onclick="e=>e.stopPropagation()">
+    <div class="modal-header" id="modalHeader"></div>
+    <div class="modal-body"   id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>
