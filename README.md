@@ -10,22 +10,22 @@ This project consists of a Python-based backend, a web-based frontend, and a ded
 
 The repository is divided into three main components:
 
-* **`backend/`**
+- **`backend/`**
   The core logic and API built with Python. Handles scheduling algorithms and database management.
 
-* **`smart-classroom-frontend/`**
+- **`smart-classroom-frontend/`**
   The web-based dashboard for users to view schedules and manage profiles.
 
-* **`notification-server/`**
+- **`notification-server/`**
   A specialized service for delivering real-time alerts and updates.
 
 ---
 
 ## 🛠️ Tech Stack
 
-* **Language:** Python
-* **Frontend:** HTML, CSS, JavaScript
-* **Other:** PowerShell, C (for specialized low-level tasks)
+- **Language:** Python
+- **Frontend:** HTML, CSS, JavaScript
+- **Other:** PowerShell, C (for specialized low-level tasks)
 
 ---
 
@@ -62,13 +62,13 @@ cd notification-server
 
 ## ✨ Features
 
-* **Conflict-Free Scheduling**
+- **Conflict-Free Scheduling**
   Automated timetable generation to prevent room or teacher overlaps.
 
-* **Real-time Sync**
+- **Real-time Sync**
   Instant notifications via the dedicated server.
 
-* **Resource Management**
+- **Resource Management**
   Track classroom availability and equipment usage.
 
 ---
@@ -82,10 +82,12 @@ Feel free to open an issue or submit a pull request for improvements.
 
 ## 📌 Future Improvements
 
-
-
-* AI-based timetable optimization
-* Mobile app integration
-* Advanced analytics dashboard
+- AI-based timetable optimization
+- Mobile app integration
+- Advanced analytics dashboard
 
 ---
+
+## how to run the backend
+
+uvicorn app.main:app --reload
