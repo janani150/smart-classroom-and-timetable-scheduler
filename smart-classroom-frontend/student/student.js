@@ -89,7 +89,7 @@ const App = {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === view));
     const titles = {
       dashboard:'Dashboard', timetable:'My Timetable', upcoming:'Upcoming Classes',
-      slotchange:'Slot Change', notifications:'Notifications', profile:'My Profile'
+      notifications:'Notifications', profile:'My Profile'
     };
     $('topbarTitle').textContent = titles[view] || view;
 
@@ -443,102 +443,6 @@ Views.upcoming = async (vc) => {
   } catch(e) {
     $('upcomingList').innerHTML = `<div class="card"><p style="color:var(--muted);">${e.message}</p></div>`;
   }
-};
-
-/* ─────────────────────────────
-   SLOT CHANGE
-───────────────────────────── */
-Views.slotchange = async (vc) => {
-  let classId = App.getClassId();
-  const latestClassId = await fetchLatestClassId(App.user.email);
-  if (latestClassId) classId = latestClassId;
-
-  vc.innerHTML = `
-    <div class="page-hdr anim"><h1>Slot Change Request</h1><p>Request a timetable slot swap — admin must approve.</p></div>
-    <div class="card anim" style="max-width:560px;">
-      <div class="card-title"><i class="fas fa-exchange-alt"></i> New Request</div>
-      <div class="form-grid">
-        <div class="fg"><label>Current Slot</label>
-          <select id="scCurrent"><option value="">Loading slots...</option></select>
-        </div>
-        <div class="fg"><label>Preferred New Slot</label>
-          <select id="scNew"><option value="">Loading slots...</option></select>
-        </div>
-        <div class="fg full"><label>Reason</label>
-          <textarea id="scReason" placeholder="Briefly explain your request..."></textarea>
-        </div>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-primary" onclick="SlotChange.submit()"><i class="fas fa-paper-plane"></i> Submit Request</button>
-        <button class="btn btn-ghost" onclick="SlotChange.clearForm()">Clear</button>
-      </div>
-    </div>
-    <div class="page-hdr anim anim-d1" style="margin-top:8px;"><h1 style="font-size:15px;">My Requests</h1></div>
-    <div id="scLog"></div>`;
-
-  await SlotChange.init(classId);
-};
-
-const SlotChange = {
-  slots: [],
-
-  async init(classId) {
-    if (!classId) {
-      $('scCurrent').innerHTML = '<option>No class linked</option>';
-      $('scNew').innerHTML     = '<option>No class linked</option>';
-      this.renderLog();
-      return;
-    }
-    try {
-      const res = await fetch(`${API}/student/timetable?classId=${encodeURIComponent(classId)}`);
-      const data = await res.json();
-      const schedule = data.schedule || {};
-      this.slots = Object.entries(schedule).map(([key, val]) => ({ key, label:`${key} — ${val.subject}` }));
-      const opts = this.slots.map(s => `<option value="${s.key}">${s.label}</option>`).join('');
-      $('scCurrent').innerHTML = '<option value="">Select current slot</option>' + opts;
-      $('scNew').innerHTML     = '<option value="">Select preferred slot</option>' + opts;
-    } catch {
-      $('scCurrent').innerHTML = '<option>Could not load</option>';
-      $('scNew').innerHTML     = '<option>Could not load</option>';
-    }
-    this.renderLog();
-  },
-
-  clearForm() {
-    $('scCurrent').selectedIndex = 0;
-    $('scNew').selectedIndex     = 0;
-    $('scReason').value          = '';
-  },
-
-  submit() {
-    const current = $('scCurrent').value;
-    const newSlot = $('scNew').value;
-    const reason  = $('scReason').value.trim();
-    if (!current || !newSlot) return toast('Select both slots', 'error');
-    if (current === newSlot)  return toast('Choose different slots', 'error');
-    const log = JSON.parse(sessionStorage.getItem('studentSlotLog') || '[]');
-    log.unshift({ current, newSlot, reason, status:'pending', ts: new Date().toLocaleString() });
-    sessionStorage.setItem('studentSlotLog', JSON.stringify(log));
-    toast('Request submitted! Admin will review it.');
-    this.clearForm();
-    this.renderLog();
-  },
-
-  renderLog() {
-    const log       = JSON.parse(sessionStorage.getItem('studentSlotLog') || '[]');
-    const container = $('scLog');
-    if (!container) return;
-    container.innerHTML = log.length
-      ? log.map(r => `
-          <div class="slot-request-card">
-            <div class="slot-req-info">
-              <h4>${r.current} → ${r.newSlot}</h4>
-              <p>${r.reason || 'No reason given'} &nbsp;·&nbsp; ${r.ts}</p>
-            </div>
-            <span class="badge badge-${r.status}">${r.status}</span>
-          </div>`).join('')
-      : '<p style="color:var(--muted);font-size:13px;">No requests submitted yet.</p>';
-  },
 };
 
 /* ─────────────────────────────

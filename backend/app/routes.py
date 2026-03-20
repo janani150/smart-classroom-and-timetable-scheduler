@@ -871,3 +871,256 @@ def get_attendance_summary(class_id: str):
         result.append(s)
 
     return sorted(result, key=lambda x: x["rate"], reverse=True)
+
+
+# ══════════════════════════════════════════════════
+#  17. SLOT CHANGE REQUESTS
+#  Students submit requests → stored in DB
+#  Admin views, approves (applies swap), or rejects
+# ══════════════════════════════════════════════════
+
+@router.get("/slot-change-requests")
+def get_slot_change_requests(
+    status:  Optional[str] = Query(None, description="Filter: pending / approved / rejected"),
+    classId: Optional[str] = Query(None, description="Filter by class ID"),
+):
+    """Admin: get all slot change requests."""
+    query: Dict[str, Any] = {}
+    if status:  query["status"]  = status
+    if classId: query["classId"] = classId
+    docs = list(db.slot_change_requests.find({}, {"_id": 1, "studentName": 1, "studentEmail": 1,
+                                                    "classId": 1, "currentSlot": 1, "newSlot": 1,
+                                                    "reason": 1, "status": 1, "submittedAt": 1}))
+    return [serialize_doc(d) for d in docs]
+
+
+@router.post("/slot-change-requests", status_code=201)
+def submit_slot_change_request(data: Dict[str, Any]):
+    """
+    Student submits a slot change request.
+    Body: { studentName, studentEmail, classId, currentSlot, newSlot, reason }
+    """
+    required = ["studentEmail", "classId", "currentSlot", "newSlot"]
+    for f in required:
+        if not data.get(f, "").strip():
+            raise HTTPException(status_code=400, detail=f"{f} is required")
+
+    doc = {
+        "studentName":  data.get("studentName", "").strip(),
+        "studentEmail": data.get("studentEmail", "").strip(),
+        "classId":      data.get("classId", "").strip(),
+        "currentSlot":  data.get("currentSlot", "").strip(),
+        "newSlot":      data.get("newSlot", "").strip(),
+        "reason":       data.get("reason", "").strip(),
+        "status":       "pending",
+        "submittedAt":  datetime.utcnow().isoformat() + "Z",
+    }
+    result = db.slot_change_requests.insert_one(doc)
+    return {"message": "Request submitted", "id": str(result.inserted_id)}
+
+
+@router.patch("/slot-change-requests/{request_id}")
+def update_slot_change_status(request_id: str, data: Dict[str, Any]):
+    """
+    Admin approves or rejects a slot change request.
+    Body: { "status": "approved" | "rejected" }
+    On approval, automatically applies the slot swap to the timetable.
+    """
+    try:
+        oid = ObjectId(request_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request ID")
+
+    new_status = data.get("status", "").strip()
+    if new_status not in ("approved", "rejected"):
+        raise HTTPException(status_code=400, detail="status must be 'approved' or 'rejected'")
+
+    req = db.slot_change_requests.find_one({"_id": oid})
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    # If approving, apply the actual slot swap in the timetable
+    if new_status == "approved":
+        class_id = req["classId"]
+        old_slot = req["currentSlot"]
+        new_slot = req["newSlot"]
+
+        tt = db.timetables.find_one({"classId": class_id})
+        if tt:
+            schedule  = dict(tt.get("schedule", {}))
+            old_entry = schedule.get(old_slot)
+            new_entry = schedule.get(new_slot)
+
+            if old_entry:
+                schedule[new_slot] = old_entry
+                if new_entry:
+                    schedule[old_slot] = new_entry
+                else:
+                    schedule.pop(old_slot, None)
+
+                db.timetables.update_one(
+                    {"classId": class_id},
+                    {"$set": {
+                        "schedule":    schedule,
+                        "version":     tt.get("version", 1) + 1,
+                        "generatedAt": datetime.utcnow().isoformat() + "Z",
+                    }}
+                )
+
+    db.slot_change_requests.update_one(
+        {"_id": oid},
+        {"$set": {"status": new_status, "resolvedAt": datetime.utcnow().isoformat() + "Z"}}
+    )
+    return {"message": f"Request {new_status}"}
+
+
+# ══════════════════════════════════════════════════
+#  17. TEACHER NOTIFICATIONS
+#  Stores notifications per teacher email.
+#  Used to alert teachers when their slot is swapped.
+# ══════════════════════════════════════════════════
+
+@router.get("/notifications/teacher")
+def get_teacher_notifications(
+    email: str = Query(..., description="Teacher email address"),
+):
+    """Get all notifications for a teacher, newest first."""
+    docs = list(db.teacher_notifications.find(
+        {"recipientEmail": email},
+        {"_id": 1, "recipientEmail": 1, "type": 1, "title": 1,
+         "body": 1, "read": 1, "createdAt": 1}
+    ).sort("createdAt", -1).limit(50))
+    return [serialize_doc(d) for d in docs]
+
+
+@router.post("/notifications/teacher", status_code=201)
+def create_teacher_notification(data: Dict[str, Any]):
+    """
+    Create a notification for a teacher.
+    Body: { recipientEmail, type, title, body }
+    Called internally when a slot swap affects another teacher.
+    """
+    recipient = data.get("recipientEmail", "").strip()
+    title     = data.get("title", "").strip()
+    body      = data.get("body", "").strip()
+
+    if not recipient or not title:
+        raise HTTPException(status_code=400, detail="recipientEmail and title are required")
+
+    doc = {
+        "recipientEmail": recipient,
+        "type":      data.get("type", "info"),
+        "title":     title,
+        "body":      body,
+        "read":      False,
+        "status":    "pending",
+        "swapMeta":  data.get("swapMeta"),   # stores classId, oldSlot, newSlot, swapperEmail
+        "createdAt": datetime.utcnow().isoformat() + "Z",
+    }
+    result = db.teacher_notifications.insert_one(doc)
+    return {"message": "Notification created", "id": str(result.inserted_id)}
+
+
+@router.patch("/notifications/teacher/{notif_id}/read")
+def mark_teacher_notification_read(notif_id: str):
+    """Mark a single notification as read."""
+    try:
+        oid = ObjectId(notif_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid notification ID")
+    db.teacher_notifications.update_one({"_id": oid}, {"$set": {"read": True}})
+    return {"message": "Marked as read"}
+
+
+@router.patch("/notifications/teacher/read-all")
+def mark_all_teacher_notifications_read(
+    email: str = Query(..., description="Teacher email"),
+):
+    """Mark all notifications for a teacher as read."""
+    db.teacher_notifications.update_many(
+        {"recipientEmail": email},
+        {"$set": {"read": True}}
+    )
+    return {"message": "All marked as read"}
+
+
+@router.post("/notifications/teacher/{notif_id}/respond")
+def respond_to_slot_swap_notification(notif_id: str, data: Dict[str, Any]):
+    """
+    Displaced teacher accepts or rejects a slot swap notification.
+    - accept  → marks notification as read + status=accepted
+    - reject  → reverses the timetable swap + status=rejected
+    Body: { "status": "accepted" | "rejected", "responderEmail": "..." }
+    """
+    try:
+        oid = ObjectId(notif_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid notification ID")
+
+    decision = data.get("status", "").strip()
+    if decision not in ("accepted", "rejected"):
+        raise HTTPException(status_code=400, detail="status must be 'accepted' or 'rejected'")
+
+    notif = db.teacher_notifications.find_one({"_id": oid})
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    if notif.get("status") and notif["status"] != "pending":
+        raise HTTPException(status_code=409, detail=f"Already {notif['status']}")
+
+    # If rejected, reverse the swap using stored swap metadata
+    if decision == "rejected":
+        swap_meta = notif.get("swapMeta")
+        if swap_meta:
+            class_id  = swap_meta.get("classId")
+            old_slot  = swap_meta.get("oldSlot")   # original slot of the swapper
+            new_slot  = swap_meta.get("newSlot")   # original slot of the displaced teacher
+            tt = db.timetables.find_one({"classId": class_id})
+            if tt:
+                schedule  = dict(tt.get("schedule", {}))
+                # Current state after swap: new_slot has swapper's subject, old_slot has displaced's
+                # Reverse: put them back
+                swapper_entry   = schedule.get(new_slot)  # swapper is now at new_slot
+                displaced_entry = schedule.get(old_slot)  # displaced is now at old_slot
+
+                if swapper_entry:
+                    schedule[old_slot] = swapper_entry   # swapper goes back
+                if displaced_entry:
+                    schedule[new_slot] = displaced_entry  # displaced goes back
+                elif new_slot in schedule:
+                    del schedule[new_slot]
+
+                db.timetables.update_one(
+                    {"classId": class_id},
+                    {"$set": {
+                        "schedule":    schedule,
+                        "version":     tt.get("version", 1) + 1,
+                        "generatedAt": datetime.utcnow().isoformat() + "Z",
+                    }}
+                )
+
+                # Notify the original swapper that their change was rejected
+                swapper_email = swap_meta.get("swapperEmail")
+                if swapper_email:
+                    responder_name = data.get("responderEmail", "The other teacher")
+                    db.teacher_notifications.insert_one({
+                        "recipientEmail": swapper_email,
+                        "type":      "error",
+                        "title":     "Slot swap was rejected",
+                        "body":      f"Your slot swap in {class_id} ({old_slot} ↔ {new_slot}) "
+                                     f"was rejected by {responder_name}. The original timetable has been restored.",
+                        "read":      False,
+                        "status":    "info",
+                        "createdAt": datetime.utcnow().isoformat() + "Z",
+                    })
+
+    # Update notification status and mark as read
+    db.teacher_notifications.update_one(
+        {"_id": oid},
+        {"$set": {
+            "read":        True,
+            "status":      decision,
+            "respondedAt": datetime.utcnow().isoformat() + "Z",
+        }}
+    )
+    return {"message": f"Swap {decision}"}

@@ -66,11 +66,25 @@ const App = {
     });
 
     this.navigate('dashboard');
+
+    // Check for unread notifications and show bell dot
+    if (this.user.email) {
+      fetch(`${API}/notifications/teacher?email=${encodeURIComponent(this.user.email)}`)
+        .then(r => r.json())
+        .then(notifs => {
+          const unread = notifs.filter(n => !n.read).length;
+          const dot = $('notifDot');
+          if (dot && unread > 0) {
+            dot.style.display = '';
+            dot.textContent = unread > 9 ? '9+' : unread;
+          }
+        }).catch(() => {});
+    }
   },
 
   navigate(view) {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === view));
-    const titles = { dashboard:'Dashboard', timetable:'My Timetable', attendance:'Attendance', classes:'Available Classes', profile:'My Profile' };
+    const titles = { dashboard:'Dashboard', timetable:'My Timetable', attendance:'Attendance', classes:'Available Classes', slotchange:'Slot Change Requests', notifications:'Notifications', profile:'My Profile' };
     $('topbarTitle').textContent = titles[view] || view;
 
     const vc = $('viewContainer');
@@ -637,6 +651,203 @@ const AvailClasses = {
 };
 
 /* ═══════════════════════════════════════
+   SLOT CHANGE REQUESTS — Teacher
+   Teacher swaps slots for their own classes.
+   Shows timetable slots they are assigned to.
+═══════════════════════════════════════ */
+Views.slotchange = async (vc) => {
+  const teacher = App.user.name || '';
+
+  vc.innerHTML = `
+    <div class="page-hdr anim"><h1>Slot Change Requests</h1><p>Swap your assigned slots across your classes.</p></div>
+
+    <!-- New request form -->
+    <div class="card anim" style="max-width:620px;">
+      <div class="card-title"><i class="fas fa-exchange-alt"></i> New Slot Change</div>
+      <div class="form-grid">
+        <div class="fg"><label>Your Class</label>
+          <select id="scClass"><option value="">Loading your classes…</option></select>
+        </div>
+        <div class="fg"><label>Date</label>
+          <input type="date" id="scDate" value="${new Date().toISOString().split('T')[0]}">
+        </div>
+        <div class="fg"><label>Current Slot</label>
+          <select id="scOld"><option value="">Select current slot</option></select>
+        </div>
+        <div class="fg"><label>Swap With Slot</label>
+          <select id="scNew"><option value="">Select new slot</option></select>
+        </div>
+        <div class="fg full"><label>Reason</label>
+          <textarea id="scReason" placeholder="Brief reason for the swap…" style="height:72px;"></textarea>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="TeacherSlotChange.submit()">
+          <i class="fas fa-check"></i> Apply Change
+        </button>
+        <button class="btn btn-ghost" onclick="TeacherSlotChange.clear()">Clear</button>
+      </div>
+    </div>
+
+    <!-- Change log -->
+    <div class="page-hdr anim anim-d1" style="margin-top:8px;">
+      <h1 style="font-size:15px;">Recent Changes This Session</h1>
+    </div>
+    <div id="scLog" class="anim anim-d2"></div>`;
+
+  await TeacherSlotChange.init(teacher);
+};
+
+const TeacherSlotChange = {
+  myClasses: [],   // { classId, schedule }
+  log: [],
+
+  async init(teacher) {
+    const sel = $('scClass');
+    try {
+      const timetables = await api('/timetables');
+      // Only show classes where this teacher has at least one slot
+      this.myClasses = timetables
+        .filter(tt => Object.values(tt.schedule || {}).some(e => e.faculty === teacher))
+        .map(tt => ({ classId: tt.classId, schedule: tt.schedule, _id: tt._id, version: tt.version, assignedHours: tt.assignedHours, totalSlots: tt.totalSlots }));
+
+      sel.innerHTML = '<option value="">Choose your class</option>';
+      this.myClasses.forEach(c => sel.innerHTML += `<option value="${c.classId}">${c.classId}</option>`);
+      if (!this.myClasses.length) sel.innerHTML = '<option>No classes assigned to you yet</option>';
+    } catch {
+      sel.innerHTML = '<option>Could not load</option>';
+    }
+
+    $('scClass').onchange = () => this.loadSlots();
+    this.renderLog();
+  },
+
+  loadSlots() {
+    const classId = $('scClass').value;
+    const cls = this.myClasses.find(c => c.classId === classId);
+    if (!cls) return;
+
+    const schedule = cls.schedule || {};
+    // All slots in the class timetable
+    const allSlots = Object.keys(schedule).sort();
+    // My slots (only where I'm the faculty)
+    const mySlots  = allSlots.filter(k => schedule[k]?.faculty === App.user.name);
+
+    const myOpts  = mySlots.map(k  => `<option value="${k}">${k} — ${schedule[k].subject}</option>`).join('');
+    const allOpts = allSlots.map(k => `<option value="${k}">${k} — ${schedule[k].subject}</option>`).join('');
+
+    $('scOld').innerHTML = '<option value="">Your slots to move</option>' + myOpts;
+    $('scNew').innerHTML = '<option value="">Swap with this slot</option>' + allOpts;
+  },
+
+  clear() {
+    ['scClass','scOld','scNew','scReason'].forEach(id => $(id).value = '');
+    $('scOld').innerHTML = '<option value="">Select current slot</option>';
+    $('scNew').innerHTML = '<option value="">Select new slot</option>';
+    $('scDate').value = new Date().toISOString().split('T')[0];
+  },
+
+  async submit() {
+    const classId = $('scClass').value;
+    const oldSlot = $('scOld').value;
+    const newSlot = $('scNew').value;
+    const date    = $('scDate').value;
+    const reason  = $('scReason').value.trim();
+
+    if (!classId) return toast('Select your class', 'error');
+    if (!oldSlot)  return toast('Select the slot to move', 'error');
+    if (!newSlot)  return toast('Select the target slot', 'error');
+    if (oldSlot === newSlot) return toast('Choose different slots', 'error');
+
+    const cls = this.myClasses.find(c => c.classId === classId);
+    if (!cls) return toast('Class not found', 'error');
+
+    try {
+      const schedule  = { ...cls.schedule };
+      const oldEntry  = schedule[oldSlot];  // teacher's own entry
+      const newEntry  = schedule[newSlot];  // entry at target slot (may belong to another teacher)
+
+      if (!oldEntry) return toast(`Slot ${oldSlot} is empty`, 'error');
+
+      // Who gets displaced?
+      const displacedTeacher = newEntry?.faculty || null;
+      const myName = App.user.name;
+
+      // Perform the swap
+      schedule[newSlot] = oldEntry;
+      if (newEntry) schedule[oldSlot] = newEntry;
+      else delete schedule[oldSlot];
+
+      await api('/timetables/bulk-update', {
+        method: 'PUT',
+        body: [{
+          id:            cls._id,
+          schedule,
+          assignedHours: cls.assignedHours,
+          totalSlots:    cls.totalSlots,
+          version:       cls.version,
+        }],
+      });
+
+      // Update local cache
+      cls.schedule = schedule;
+
+      // Notify the displaced teacher if it's a different person
+      if (displacedTeacher && displacedTeacher !== myName) {
+        // Find displaced teacher's email
+        try {
+          const teachers = await api('/teachers');
+          const displaced = teachers.find(t => t.name === displacedTeacher);
+          if (displaced?.email) {
+            await fetch(`${API}/notifications/teacher`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                recipientEmail: displaced.email,
+                type:  'warn',
+                title: 'Your slot was moved',
+                body:  `${myName} swapped your slot in ${classId}. ` +
+                       `Your ${newSlot} (${newEntry.subject}) moved to ${oldSlot}. ` +
+                       `Reason: ${reason || 'No reason given'}. Date: ${date}.`,
+                swapMeta: {
+                  classId,
+                  oldSlot,      // swapper's original slot
+                  newSlot,      // displaced teacher's original slot
+                  swapperEmail: App.user.email,
+                  swapperName:  myName,
+                },
+              }),
+            });
+          }
+        } catch { /* notification failure should not block the swap */ }
+      }
+
+      this.log.unshift({ classId, date, oldSlot, newSlot, reason, displacedTeacher, ts: new Date().toLocaleTimeString() });
+      this.renderLog();
+      toast(`Slot change applied — ${oldSlot} ↔ ${newSlot}${displacedTeacher && displacedTeacher !== myName ? ` · ${displacedTeacher} notified` : ''}`);
+      this.clear();
+    } catch(e) { toast(e.message, 'error'); }
+  },
+
+  renderLog() {
+    const container = $('scLog');
+    if (!container) return;
+    container.innerHTML = this.log.length
+      ? this.log.map(c => `
+          <div class="change-row anim">
+            <span><span class="badge badge-blue">${c.classId}</span></span>
+            <span style="font-size:13px;"><strong>${c.oldSlot}</strong> → <strong>${c.newSlot}</strong>
+              ${c.reason ? `&nbsp;·&nbsp; ${c.reason}` : ''}
+              ${c.displacedTeacher && c.displacedTeacher !== App.user.name ? `&nbsp;·&nbsp; <span style="color:var(--muted)">notified ${c.displacedTeacher}</span>` : ''}
+              &nbsp;·&nbsp; ${c.date} ${c.ts}
+            </span>
+            <span class="badge badge-green">applied</span>
+          </div>`).join('')
+      : '<p style="color:var(--muted);font-size:13px;">No changes yet this session.</p>';
+  },
+};
+
+/* ═══════════════════════════════════════
    PROFILE — Teacher
    Loads from API, falls back to session.
    Supports inline Edit → Save.
@@ -826,6 +1037,128 @@ const TeacherProfile = {
     } catch(e) {
       toast(e.message || 'Save failed', 'error');
     }
+  },
+};
+
+/* ═══════════════════════════════════════
+   NOTIFICATIONS — Teacher
+   Shows slot change alerts from other teachers.
+   Displaced teacher can Accept or Reject the swap.
+═══════════════════════════════════════ */
+Views.notifications = async (vc) => {
+  const user = App.user;
+
+  vc.innerHTML = `
+    <div class="page-hdr anim" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+      <div><h1>Notifications</h1><p>Alerts about slot changes and timetable updates.</p></div>
+      <button class="btn btn-ghost btn-sm" onclick="TeacherNotifs.markAll()">
+        <i class="fas fa-check-double"></i> Mark all read
+      </button>
+    </div>
+    <div id="notifList" class="notif-list anim"></div>`;
+
+  await TeacherNotifs.load(user.email);
+};
+
+const TeacherNotifs = {
+  async load(email) {
+    const container = $('notifList');
+    if (!container) return;
+    try {
+      const res = await fetch(`${API}/notifications/teacher?email=${encodeURIComponent(email)}`);
+      const notifs = await res.json();
+
+      if (!notifs.length) {
+        container.innerHTML = '<p style="color:var(--muted);font-size:13px;text-align:center;padding:28px;">No notifications yet.</p>';
+        return;
+      }
+
+      const unreadCount = notifs.filter(n => !n.read).length;
+      const dot = $('notifDot');
+      if (dot) { dot.style.display = unreadCount ? '' : 'none'; dot.textContent = unreadCount > 9 ? '9+' : unreadCount; }
+
+      container.innerHTML = notifs.map(n => {
+        const isSlotSwap  = n.type === 'warn' && n.body && n.body.includes('swapped your slot');
+        const iconMap     = { warn:'fa-exclamation-triangle', info:'fa-info-circle', success:'fa-check-circle', error:'fa-times-circle' };
+        const colorMap    = { warn:'ni-warn', info:'ni-info', success:'ni-success', error:'ni-error' };
+        const status      = n.status || 'pending';  // pending | accepted | rejected
+
+        // Action buttons only for unread swap notifications that are still pending
+        const actionBtns = (isSlotSwap && !n.read && status === 'pending') ? `
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn btn-success btn-sm" onclick="TeacherNotifs.respond('${n._id}', 'accepted')">
+              <i class="fas fa-check"></i> Accept
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="TeacherNotifs.respond('${n._id}', 'rejected')">
+              <i class="fas fa-times"></i> Reject (Reverse Swap)
+            </button>
+          </div>` : '';
+
+        // Status badge for already-responded notifications
+        const statusBadge = (isSlotSwap && status !== 'pending') ? `
+          <span class="badge ${status === 'accepted' ? 'badge-green' : 'badge-red'}" style="margin-top:8px;display:inline-block;">
+            ${status === 'accepted' ? '✓ Accepted' : '✗ Rejected & Reversed'}
+          </span>` : '';
+
+        return `
+          <div class="notif-item ${n.read && status !== 'pending' ? '' : 'unread'} anim" id="notif-${n._id}"
+               style="flex-direction:column;align-items:flex-start;gap:8px;">
+            <div style="display:flex;gap:12px;width:100%;align-items:flex-start;">
+              <div class="notif-icon ${colorMap[n.type]||'ni-info'}">
+                <i class="fas ${iconMap[n.type]||'fa-bell'}"></i>
+              </div>
+              <div class="notif-body" style="flex:1;">
+                <h4>${n.title}${(!n.read && status === 'pending') ? '<span class="notif-unread-badge"></span>' : ''}</h4>
+                <p>${n.body}</p>
+                ${statusBadge}
+              </div>
+              <span class="notif-time" style="flex-shrink:0;">${new Date(n.createdAt).toLocaleString()}</span>
+            </div>
+            ${actionBtns}
+          </div>`;
+      }).join('');
+    } catch {
+      container.innerHTML = '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px;">Could not load notifications.</p>';
+    }
+  },
+
+  async respond(notifId, decision) {
+    const user = App.user;
+    try {
+      const res = await fetch(`${API}/notifications/teacher/${notifId}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: decision, responderEmail: user.email }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.detail || 'Failed');
+
+      if (decision === 'accepted') {
+        toast('Swap accepted — your timetable has been updated.', 'success');
+      } else {
+        toast('Swap rejected — the original slot arrangement has been restored.', 'info');
+      }
+
+      await TeacherNotifs.load(user.email);
+    } catch(e) { toast(e.message || 'Could not process response', 'error'); }
+  },
+
+  async markOne(id) {
+    try {
+      await fetch(`${API}/notifications/teacher/${id}/read`, { method: 'PATCH' });
+      await TeacherNotifs.load(App.user.email);
+    } catch { toast('Could not mark as read', 'error'); }
+  },
+
+  async markAll() {
+    const user = App.user;
+    try {
+      await fetch(`${API}/notifications/teacher/read-all?email=${encodeURIComponent(user.email)}`, { method: 'PATCH' });
+      toast('All marked as read');
+      const dot = $('notifDot');
+      if (dot) dot.style.display = 'none';
+      await TeacherNotifs.load(user.email);
+    } catch { toast('Could not mark all as read', 'error'); }
   },
 };
 
