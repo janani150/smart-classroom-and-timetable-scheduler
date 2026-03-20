@@ -1226,7 +1226,7 @@ Views.profile = async (vc) => {
 const ProfileAdmin = {
   async load(user) {
     try {
-      const data = await api(`/profile/admin/${encodeURIComponent(user.email)}`);
+      const data = await api(`/profile/admin?email=${encodeURIComponent(user.email)}`);
       const grid = $('profileGrid');
       if (!grid) return;
 
@@ -1431,14 +1431,14 @@ const StudentList = {
     const classId = $('assignClassSel')?.value;
     if (!classId) return toast('Select a class first', 'error');
     try {
-      await fetch(`${API}/students/${encodeURIComponent(email)}/assign-class`, {
-        method: 'PATCH',
+      const res = await fetch(`${API}/students/assign-class`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ classId }),
-      }).then(async r => {
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.detail || 'Failed');
+        body: JSON.stringify({ email, classId }),
       });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.detail || 'Failed to assign class');
+
       App.closeModal();
       toast(`${email} assigned to ${classId}`);
       // Update cell immediately without full reload

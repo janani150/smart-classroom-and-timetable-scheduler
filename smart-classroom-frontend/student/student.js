@@ -34,11 +34,30 @@ function getSession() {
 
 const DAY_ORDER  = { Mon:0, Tue:1, Wed:2, Thu:3, Fri:4, Sat:5 };
 const DAYS       = ['Mon','Tue','Wed','Thu','Fri'];
-const PERIOD_TIMES = { P1:'9:00–10:00', P2:'10:00–11:00', P3:'11:00–12:00', P4:'1:00–2:00', P5:'2:00–3:00', P6:'3:00–4:00' };
+const PERIOD_TIMES = { P1:'9:00-10:00', P2:'10:00-11:00', P3:'11:00-12:00', P4:'1:00-2:00', P5:'2:00-3:00', P6:'3:00-4:00' };
 const PERIODS    = Object.keys(PERIOD_TIMES);
 
 function todayKey() {
   return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
+}
+
+/* ── Fetch latest classId from DB (avoids needing re-login after admin assigns class) ── */
+async function fetchLatestClassId(email) {
+  try {
+    const res = await fetch(`${API}/profile/student?email=${encodeURIComponent(email)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.classId) {
+      // Update session so other views benefit
+      const session = JSON.parse(sessionStorage.getItem('user') || '{}');
+      sessionStorage.setItem('user', JSON.stringify({ ...session, classId: data.classId }));
+      App.user.classId = data.classId;
+      if ($('topbarClass')) $('topbarClass').textContent = data.classId;
+    }
+    return data.classId || null;
+  } catch {
+    return null;
+  }
 }
 
 /* ════════════════════════════════════════
@@ -50,14 +69,12 @@ const App = {
   init() {
     this.user = getSession();
 
-    // Populate sidebar
     const name  = this.user.name  || 'Student';
     const email = this.user.email || '';
     $('sidebarName').textContent  = name;
     $('sidebarEmail').textContent = email;
     $('userAvatar').textContent   = name[0]?.toUpperCase() || 'S';
 
-    // Nav handlers
     document.querySelectorAll('.nav-item').forEach(el => {
       el.addEventListener('click', () => {
         this.navigate(el.dataset.view);
@@ -70,7 +87,10 @@ const App = {
 
   navigate(view) {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === view));
-    const titles = { dashboard:'Dashboard', timetable:'My Timetable', upcoming:'Upcoming Classes', slotchange:'Slot Change', notifications:'Notifications', profile:'My Profile' };
+    const titles = {
+      dashboard:'Dashboard', timetable:'My Timetable', upcoming:'Upcoming Classes',
+      slotchange:'Slot Change', notifications:'Notifications', profile:'My Profile'
+    };
     $('topbarTitle').textContent = titles[view] || view;
 
     const vc = $('viewContainer');
@@ -102,10 +122,9 @@ const Views = {};
    DASHBOARD
 ───────────────────────────── */
 Views.dashboard = async (vc) => {
-  const user    = App.user;
-  const classId = App.getClassId();
-  const name    = user.name || 'Student';
-  const today   = todayKey();
+  const user  = App.user;
+  const today = todayKey();
+  const name  = user.name || 'Student';
 
   vc.innerHTML = `
     <div class="profile-card anim">
@@ -113,7 +132,7 @@ Views.dashboard = async (vc) => {
       <div>
         <div class="profile-name">Welcome back, ${name}!</div>
         <div class="profile-meta">
-          ${user.department ? user.department + ' &nbsp;·&nbsp; ' : ''}
+          ${user.department ? user.department + ' &nbsp;&middot;&nbsp; ' : ''}
           ${user.year ? 'Year ' + user.year : ''}
           ${user.section ? ' — Section ' + user.section : ''}
         </div>
@@ -149,27 +168,26 @@ Views.dashboard = async (vc) => {
       </div>
     </div>
 
-    <!-- Today's mini-timetable -->
     <div class="card anim anim-d3">
       <div class="card-title"><i class="fas fa-sun"></i> Today (${today})</div>
-      <div id="todaySlots"><p style="color:var(--muted);font-size:13px;">Loading today's schedule…</p></div>
+      <div id="todaySlots"><p style="color:var(--muted);font-size:13px;">Loading today's schedule...</p></div>
     </div>`;
 
-  // Update class badge in topbar
+  // Get latest classId (fetches from DB in case admin just assigned)
+  let classId = App.getClassId();
+  const latestClassId = await fetchLatestClassId(user.email);
+  if (latestClassId) classId = latestClassId;
   if (classId) $('topbarClass').textContent = classId;
 
-  // Load timetable data
   if (classId) {
     try {
       const res = await fetch(`${API}/student/timetable?classId=${encodeURIComponent(classId)}`);
       const data = await res.json();
       const schedule = data.schedule || {};
 
-      // Count today's classes
       const todayClasses = PERIODS.map(p => schedule[`${today}-${p}`]).filter(Boolean);
       $('dToday').textContent = todayClasses.length;
 
-      // Next class
       const nowH = new Date().getHours();
       const periodStartH = { P1:9, P2:10, P3:11, P4:13, P5:14, P6:15 };
       const nextEntry = PERIODS.find(p => {
@@ -184,7 +202,6 @@ Views.dashboard = async (vc) => {
         $('dNext').style.fontSize = '12px';
       }
 
-      // Today's card
       const container = $('todaySlots');
       if (todayClasses.length === 0) {
         container.innerHTML = '<p style="color:var(--muted);font-size:13px;">No classes scheduled today.</p>';
@@ -206,14 +223,15 @@ Views.dashboard = async (vc) => {
           </div>`;
         }).join('')}</div>`;
       }
-    } catch { $('todaySlots').innerHTML = '<p style="color:var(--muted);font-size:13px;">Could not load today\'s schedule.</p>'; }
+    } catch {
+      $('todaySlots').innerHTML = '<p style="color:var(--muted);font-size:13px;">Could not load today\'s schedule.</p>';
+    }
   } else {
     $('todaySlots').innerHTML = `
       <div style="text-align:center;padding:12px 0;">
         <i class="fas fa-unlink" style="font-size:28px;color:var(--muted);opacity:.35;display:block;margin-bottom:10px;"></i>
         <p style="font-size:13px;color:var(--muted);line-height:1.7;">
-          No class linked yet.<br>
-          Ask your admin to assign you to a class, then log out and back in.
+          No class linked yet. Ask your admin to assign you to a class.
         </p>
         <button class="qa-btn qa-ghost" style="margin-top:10px;" onclick="App.navigate('timetable')">
           <i class="fas fa-info-circle"></i> See details
@@ -221,7 +239,6 @@ Views.dashboard = async (vc) => {
       </div>`;
   }
 
-  // Slot & notification counts from session storage
   const slotLog   = JSON.parse(sessionStorage.getItem('studentSlotLog')   || '[]');
   const notifList = JSON.parse(sessionStorage.getItem('studentNotifList') || '[]');
   $('dSlots').textContent  = slotLog.length;
@@ -233,22 +250,26 @@ Views.dashboard = async (vc) => {
    TIMETABLE
 ───────────────────────────── */
 Views.timetable = async (vc) => {
-  const classId = App.getClassId();
-  const user    = App.user;
-  const today   = todayKey();
+  const user  = App.user;
+  const today = todayKey();
 
   vc.innerHTML = `
-    <div class="page-hdr anim"><h1>My Timetable</h1><p>Full weekly schedule for ${classId || 'your class'}.</p></div>
+    <div class="page-hdr anim"><h1>My Timetable</h1><p>Full weekly schedule for your class.</p></div>
     <div class="card anim" style="padding:0;overflow:hidden;">
       <div id="ttWrap" style="overflow-x:auto;padding:0;">
-        <p style="padding:24px;color:var(--muted);text-align:center;">Loading timetable…</p>
+        <p style="padding:24px;color:var(--muted);text-align:center;">Loading timetable...</p>
       </div>
     </div>
     <p class="anim anim-d1" style="font-size:12px;color:var(--muted);margin-top:4px;">
       <i class="fas fa-circle" style="color:var(--accent);font-size:9px;"></i> Highlighted row = today
     </p>`;
 
-  // ── No classId at all ──
+  // Always fetch latest classId from DB — no re-login needed after admin assigns
+  let classId = App.getClassId();
+  const latestClassId = await fetchLatestClassId(user.email);
+  if (latestClassId) classId = latestClassId;
+
+  // No classId
   if (!classId) {
     $('ttWrap').innerHTML = `
       <div style="padding:32px;text-align:center;">
@@ -256,42 +277,44 @@ Views.timetable = async (vc) => {
         <p style="font-weight:600;color:var(--text);margin-bottom:8px;">No class linked to your account</p>
         <p style="font-size:13px;color:var(--muted);line-height:1.7;">
           Your account <strong>${user.email || ''}</strong> has not been assigned to a class yet.<br>
-          Ask your admin to go to <strong>Dashboard → Students</strong>, find your name and click <strong>Assign Class</strong>.<br>
-          Then <strong>log out and log back in</strong> — your timetable will appear here.
+          Ask your admin to go to <strong>Dashboard → Students</strong>, find your name and click <strong>Assign Class</strong>.
         </p>
         <div style="margin-top:16px;background:var(--accent-light);border-radius:10px;padding:12px 16px;display:inline-block;text-align:left;">
-          <p style="font-size:12px;font-weight:700;color:var(--accent-dk);margin-bottom:4px;">What the admin needs to do:</p>
+          <p style="font-size:12px;font-weight:700;color:var(--accent-dk);margin-bottom:4px;">Steps:</p>
           <ol style="font-size:12px;color:var(--accent-dk);padding-left:18px;line-height:1.9;">
-            <li>Open Admin Panel → Dashboard → click <strong>Students</strong></li>
-            <li>Find your name in the list</li>
-            <li>Click <strong>Assign Class</strong> button on your row</li>
-            <li>Select the correct class (e.g. <em>CSE-1-A</em>)</li>
-            <li>You log out and log back in</li>
+            <li>Admin → Dashboard → click <strong>Students</strong></li>
+            <li>Find your name → click <strong>Assign Class</strong></li>
+            <li>Select your class → Save</li>
+            <li>Click <strong>Refresh</strong> below</li>
           </ol>
         </div>
+        <br>
+        <button class="btn btn-primary" style="margin-top:14px;" onclick="App.navigate('timetable')">
+          <i class="fas fa-sync"></i> Refresh
+        </button>
       </div>`;
     return;
   }
 
+  // Fetch timetable
   try {
-    const res = await fetch(`${API}/student/timetable?classId=${encodeURIComponent(classId)}`);
+    const res  = await fetch(`${API}/student/timetable?classId=${encodeURIComponent(classId)}`);
     const data = await res.json();
 
-    // ── Timetable exists but not published yet ──
     if (!res.ok) {
-      const isNotPublished = res.status === 404;
       $('ttWrap').innerHTML = `
         <div style="padding:32px;text-align:center;">
           <i class="fas fa-clock" style="font-size:38px;color:var(--muted);opacity:.35;display:block;margin-bottom:14px;"></i>
-          <p style="font-weight:600;color:var(--text);margin-bottom:8px;">
-            ${isNotPublished ? 'Timetable not published yet' : 'Could not load timetable'}
-          </p>
+          <p style="font-weight:600;color:var(--text);margin-bottom:8px;">Timetable not published yet</p>
           <p style="font-size:13px;color:var(--muted);line-height:1.7;">
             Your class is <strong>${classId}</strong>.<br>
-            ${isNotPublished
-              ? 'The admin has not published the timetable for your class yet.<br>Ask them to go to <strong>Timetable Viewer → Publish</strong>.'
+            ${res.status === 404
+              ? 'The admin has not published the timetable yet.<br>Ask them to go to <strong>Timetable Viewer → Publish</strong>.'
               : (data.detail || data.message || 'An error occurred.')}
           </p>
+          <button class="btn btn-primary" style="margin-top:14px;" onclick="App.navigate('timetable')">
+            <i class="fas fa-sync"></i> Refresh
+          </button>
         </div>`;
       return;
     }
@@ -299,21 +322,19 @@ Views.timetable = async (vc) => {
     const schedule = data.schedule || {};
     const days     = data.workingDaysSorted || DAYS;
 
-    // ── Empty schedule ──
     if (!Object.keys(schedule).length) {
       $('ttWrap').innerHTML = `
         <div style="padding:32px;text-align:center;">
           <i class="fas fa-calendar-times" style="font-size:38px;color:var(--muted);opacity:.35;display:block;margin-bottom:14px;"></i>
           <p style="font-weight:600;color:var(--text);margin-bottom:8px;">Timetable is empty</p>
           <p style="font-size:13px;color:var(--muted);">
-            Your class <strong>${classId}</strong> has a published timetable but no subjects are assigned.<br>
-            Ask your admin to add subjects and regenerate.
+            Class <strong>${classId}</strong> timetable has no subjects assigned.<br>
+            Ask admin to add subjects and regenerate.
           </p>
         </div>`;
       return;
     }
 
-    // ── Render full timetable ──
     $('ttWrap').innerHTML = `
       <table class="tt">
         <thead>
@@ -340,6 +361,9 @@ Views.timetable = async (vc) => {
       <div style="padding:28px;text-align:center;">
         <i class="fas fa-exclamation-triangle" style="font-size:32px;color:#f59e0b;display:block;margin-bottom:10px;"></i>
         <p style="color:var(--muted);font-size:13px;">${e.message || 'Could not load timetable. Check if the backend is running.'}</p>
+        <button class="btn btn-primary" style="margin-top:12px;" onclick="App.navigate('timetable')">
+          <i class="fas fa-sync"></i> Retry
+        </button>
       </div>`;
   }
 };
@@ -348,22 +372,26 @@ Views.timetable = async (vc) => {
    UPCOMING CLASSES
 ───────────────────────────── */
 Views.upcoming = async (vc) => {
-  const classId = App.getClassId();
-  const today   = todayKey();
+  const user  = App.user;
+  const today = todayKey();
 
   vc.innerHTML = `
     <div class="page-hdr anim"><h1>Upcoming Classes</h1><p>Your next sessions this week.</p></div>
     <div id="upcomingList"></div>`;
 
+  let classId = App.getClassId();
+  const latestClassId = await fetchLatestClassId(user.email);
+  if (latestClassId) classId = latestClassId;
+
   if (!classId) {
-    $('upcomingList').innerHTML = '<div class="card"><p style="color:var(--muted);">No class ID found.</p></div>';
+    $('upcomingList').innerHTML = '<div class="card"><p style="color:var(--muted);">No class ID found. Ask admin to assign you to a class.</p></div>';
     return;
   }
 
   try {
     const res = await fetch(`${API}/student/timetable?classId=${encodeURIComponent(classId)}`);
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Not found');
+    if (!res.ok) throw new Error(data.message || 'Timetable not published yet');
 
     const schedule = data.schedule || {};
     const days     = data.workingDaysSorted || DAYS;
@@ -371,27 +399,26 @@ Views.upcoming = async (vc) => {
     const periodStartH = { P1:9, P2:10, P3:11, P4:13, P5:14, P6:15 };
     const todayIdx = DAY_ORDER[today] ?? -1;
 
-    // Build upcoming list: today's remaining + rest of week
     const container = $('upcomingList');
     let html = '';
     let anyFound = false;
 
     days.forEach((day, di) => {
-      const dayIdx = DAY_ORDER[day] ?? di;
+      const dayIdx  = DAY_ORDER[day] ?? di;
       const isToday = day === today;
       const entries = PERIODS.map(p => {
         const e = schedule[`${day}-${p}`];
         if (!e) return null;
         const startH = periodStartH[p] || 0;
-        if (isToday && startH < nowH) return null; // past
+        if (isToday && startH < nowH) return null;
         return { period: p, startH, ...e };
       }).filter(Boolean);
 
       if (!entries.length) return;
-      if (dayIdx < todayIdx) return; // days already passed
+      if (dayIdx < todayIdx) return;
 
       anyFound = true;
-      html += `<div class="day-label anim">${isToday ? '📅 Today' : day}</div>
+      html += `<div class="day-label anim">${isToday ? 'Today' : day}</div>
         <div class="class-list">
           ${entries.map((e, idx) => {
             const isNow = isToday && e.startH === nowH;
@@ -404,7 +431,7 @@ Views.upcoming = async (vc) => {
                 <h3>${e.subject}</h3>
                 <p>${e.faculty || 'Faculty TBA'}</p>
               </div>
-              <span class="class-period ${isNow ? 'badge-info' : ''}" style="background:var(--accent-light);color:var(--accent-dk);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;">
+              <span style="background:var(--accent-light);color:var(--accent-dk);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;">
                 ${isNow ? 'Now' : 'Upcoming'}
               </span>
             </div>`;
@@ -422,22 +449,23 @@ Views.upcoming = async (vc) => {
    SLOT CHANGE
 ───────────────────────────── */
 Views.slotchange = async (vc) => {
-  const classId = App.getClassId();
+  let classId = App.getClassId();
+  const latestClassId = await fetchLatestClassId(App.user.email);
+  if (latestClassId) classId = latestClassId;
 
   vc.innerHTML = `
     <div class="page-hdr anim"><h1>Slot Change Request</h1><p>Request a timetable slot swap — admin must approve.</p></div>
-
     <div class="card anim" style="max-width:560px;">
       <div class="card-title"><i class="fas fa-exchange-alt"></i> New Request</div>
       <div class="form-grid">
         <div class="fg"><label>Current Slot</label>
-          <select id="scCurrent"><option value="">Loading slots…</option></select>
+          <select id="scCurrent"><option value="">Loading slots...</option></select>
         </div>
         <div class="fg"><label>Preferred New Slot</label>
-          <select id="scNew"><option value="">Loading slots…</option></select>
+          <select id="scNew"><option value="">Loading slots...</option></select>
         </div>
         <div class="fg full"><label>Reason</label>
-          <textarea id="scReason" placeholder="Briefly explain your request…"></textarea>
+          <textarea id="scReason" placeholder="Briefly explain your request..."></textarea>
         </div>
       </div>
       <div class="btn-row">
@@ -445,7 +473,6 @@ Views.slotchange = async (vc) => {
         <button class="btn btn-ghost" onclick="SlotChange.clearForm()">Clear</button>
       </div>
     </div>
-
     <div class="page-hdr anim anim-d1" style="margin-top:8px;"><h1 style="font-size:15px;">My Requests</h1></div>
     <div id="scLog"></div>`;
 
@@ -467,7 +494,6 @@ const SlotChange = {
       const data = await res.json();
       const schedule = data.schedule || {};
       this.slots = Object.entries(schedule).map(([key, val]) => ({ key, label:`${key} — ${val.subject}` }));
-
       const opts = this.slots.map(s => `<option value="${s.key}">${s.label}</option>`).join('');
       $('scCurrent').innerHTML = '<option value="">Select current slot</option>' + opts;
       $('scNew').innerHTML     = '<option value="">Select preferred slot</option>' + opts;
@@ -488,14 +514,11 @@ const SlotChange = {
     const current = $('scCurrent').value;
     const newSlot = $('scNew').value;
     const reason  = $('scReason').value.trim();
-
-    if (!current || !newSlot) return toast('Select both slots','error');
-    if (current === newSlot)   return toast('Choose different slots','error');
-
+    if (!current || !newSlot) return toast('Select both slots', 'error');
+    if (current === newSlot)  return toast('Choose different slots', 'error');
     const log = JSON.parse(sessionStorage.getItem('studentSlotLog') || '[]');
     log.unshift({ current, newSlot, reason, status:'pending', ts: new Date().toLocaleString() });
     sessionStorage.setItem('studentSlotLog', JSON.stringify(log));
-
     toast('Request submitted! Admin will review it.');
     this.clearForm();
     this.renderLog();
@@ -531,27 +554,23 @@ Views.notifications = async (vc) => {
     <div id="notifList" class="notif-list"></div>`;
 
   Notifs.render();
-  // Hide dot once opened
   $('notifDot').style.display = 'none';
 };
 
 const Notifs = {
   defaultNotifs() {
     return [
-      { id:1, type:'info',    icon:'ni-info',    title:'Timetable published',            body:'Your class timetable has been published by the admin.', time:'Just now',   unread:true  },
-      { id:2, type:'warn',    icon:'ni-warn',    title:'Slot change request pending',     body:'Your request is awaiting admin approval.',              time:'5 min ago',  unread:true  },
-      { id:3, type:'success', icon:'ni-success', title:'Timetable updated',               body:'A slot change was applied to your schedule.',           time:'1 hour ago', unread:false },
-      { id:4, type:'info',    icon:'ni-info',    title:'New week schedule available',     body:'Week schedule has been updated. Check your timetable.', time:'Yesterday',  unread:false },
+      { id:1, type:'info',    icon:'ni-info',    title:'Timetable published',        body:'Your class timetable has been published by the admin.', time:'Just now',   unread:true  },
+      { id:2, type:'warn',    icon:'ni-warn',    title:'Slot change request pending', body:'Your request is awaiting admin approval.',              time:'5 min ago',  unread:true  },
+      { id:3, type:'success', icon:'ni-success', title:'Timetable updated',           body:'A slot change was applied to your schedule.',           time:'1 hour ago', unread:false },
+      { id:4, type:'info',    icon:'ni-info',    title:'New week schedule available', body:'Week schedule has been updated. Check your timetable.', time:'Yesterday',  unread:false },
     ];
   },
-
   getList() {
     const raw = sessionStorage.getItem('studentNotifList');
     return raw ? JSON.parse(raw) : this.defaultNotifs();
   },
-
   save(list) { sessionStorage.setItem('studentNotifList', JSON.stringify(list)); },
-
   markAllRead() {
     const list = this.getList().map(n => ({...n, unread:false}));
     this.save(list);
@@ -559,19 +578,16 @@ const Notifs = {
     this.render();
     toast('All marked as read');
   },
-
   clear() {
     this.save([]);
     $('notifDot').style.display = 'none';
     this.render();
     toast('Cleared');
   },
-
   render() {
     const list      = this.getList();
     const container = $('notifList');
     if (!container) return;
-
     container.innerHTML = list.length
       ? list.map(n => `
           <div class="notif-item ${n.unread ? 'unread' : ''} anim">
@@ -586,18 +602,14 @@ const Notifs = {
   },
 };
 
-/* ═══════════════════════════════════════
-   PROFILE — Student
-   Loads from API, falls back to session.
-   Supports inline Edit → Save.
-═══════════════════════════════════════ */
+/* ─────────────────────────────
+   PROFILE
+───────────────────────────── */
 Views.profile = async (vc) => {
   const user = App.user;
 
   vc.innerHTML = `
     <div class="page-hdr anim"><h1>My Profile</h1><p>View and update your account details.</p></div>
-
-    <!-- Hero banner -->
     <div class="prof-hero anim">
       <div class="prof-avatar" id="profAvatar">${(user.name||'S')[0].toUpperCase()}</div>
       <div class="prof-meta">
@@ -609,56 +621,39 @@ Views.profile = async (vc) => {
         <i class="fas fa-edit"></i> Edit Profile
       </button>
     </div>
-
-    <!-- Read-only fields -->
     <div class="card anim anim-d1" id="profViewCard">
       <div class="card-title"><i class="fas fa-id-card"></i> Account Details</div>
       <div id="profFieldGrid" class="prof-field-grid">
         <div class="prof-loading"><div class="loader-ring"></div></div>
       </div>
     </div>
-
-    <!-- Edit form (hidden by default) -->
     <div class="card anim anim-d1" id="profEditCard" style="display:none;">
       <div class="card-title"><i class="fas fa-pen"></i> Edit Details</div>
       <div class="form-grid">
-        <div class="fg"><label>Full Name</label>
-          <input id="efName" placeholder="Your full name">
-        </div>
+        <div class="fg"><label>Full Name</label><input id="efName" placeholder="Your full name"></div>
         <div class="fg"><label>Department</label>
-          <input id="efDept" placeholder="e.g. Computer Science" disabled
-            style="opacity:.6;cursor:not-allowed;" title="Contact admin to change department">
+          <input id="efDept" disabled style="opacity:.6;cursor:not-allowed;" title="Contact admin to change">
         </div>
         <div class="fg"><label>Year</label>
           <select id="efYear">
-            <option value="1">Year 1</option>
-            <option value="2">Year 2</option>
-            <option value="3">Year 3</option>
-            <option value="4">Year 4</option>
+            <option value="1">Year 1</option><option value="2">Year 2</option>
+            <option value="3">Year 3</option><option value="4">Year 4</option>
           </select>
         </div>
         <div class="fg"><label>Section</label>
           <select id="efSection">
-            <option value="A">Section A</option>
-            <option value="B">Section B</option>
-            <option value="C">Section C</option>
-            <option value="D">Section D</option>
+            <option value="A">Section A</option><option value="B">Section B</option>
+            <option value="C">Section C</option><option value="D">Section D</option>
           </select>
         </div>
-        <div class="fg"><label>Phone (optional)</label>
-          <input id="efPhone" placeholder="e.g. 9876543210">
-        </div>
+        <div class="fg"><label>Phone (optional)</label><input id="efPhone" placeholder="9876543210"></div>
       </div>
       <p style="font-size:12px;color:var(--muted);margin-top:8px;">
         <i class="fas fa-info-circle"></i> Department and Class ID can only be changed by your admin.
       </p>
       <div class="btn-row">
-        <button class="btn btn-primary" onclick="StudentProfile.save()">
-          <i class="fas fa-save"></i> Save Changes
-        </button>
-        <button class="btn btn-ghost" onclick="StudentProfile.toggleEdit()">
-          Cancel
-        </button>
+        <button class="btn btn-primary" onclick="StudentProfile.save()"><i class="fas fa-save"></i> Save Changes</button>
+        <button class="btn btn-ghost" onclick="StudentProfile.toggleEdit()">Cancel</button>
       </div>
     </div>`;
 
@@ -672,24 +667,28 @@ const StudentProfile = {
   async load() {
     const user = App.user;
     try {
-      const res = await fetch(`${API}/profile/student/${encodeURIComponent(user.email)}`);
-      const d   = await res.json();
-      if (!res.ok) throw new Error(d.detail || 'Not found');
+      const res = await fetch(`${API}/profile/student?email=${encodeURIComponent(user.email)}`);
+      if (!res.ok) throw new Error('Could not load profile');
+      const d = await res.json();
       this.data = d;
+
+      // Update session with latest classId
+      if (d.classId) {
+        const session = JSON.parse(sessionStorage.getItem('user') || '{}');
+        sessionStorage.setItem('user', JSON.stringify({ ...session, classId: d.classId }));
+        App.user.classId = d.classId;
+        if ($('topbarClass')) $('topbarClass').textContent = d.classId;
+      }
+
       this.renderFields(d);
-      // Update hero with live data
       const n = $('profName');  if (n) n.textContent = d.name  || user.name  || '—';
       const e = $('profEmail'); if (e) e.textContent = d.email || user.email || '—';
       const a = $('profAvatar');if (a) a.textContent = (d.name||user.name||'S')[0].toUpperCase();
     } catch {
-      // Fallback to session data
       this.data = {
-        name:       user.name       || '',
-        email:      user.email      || '',
-        department: user.department || '',
-        year:       user.year       || '',
-        section:    user.section    || '',
-        classId:    user.classId    || '',
+        name: user.name||'', email: user.email||'',
+        department: user.department||'', year: user.year||'',
+        section: user.section||'', classId: user.classId||'',
       };
       this.renderFields(this.data);
     }
@@ -698,18 +697,16 @@ const StudentProfile = {
   renderFields(d) {
     const grid = $('profFieldGrid');
     if (!grid) return;
-
     const fields = [
-      { icon:'fa-user',         label:'Full Name',   value: d.name                              || '—' },
-      { icon:'fa-envelope',     label:'Email',        value: d.email                             || '—' },
-      { icon:'fa-layer-group',  label:'Department',   value: d.department                        || '—' },
-      { icon:'fa-calendar-alt', label:'Year',         value: d.year    ? `Year ${d.year}`        : '—' },
-      { icon:'fa-bookmark',     label:'Section',      value: d.section                           || '—' },
-      { icon:'fa-id-badge',     label:'Class ID',     value: d.classId                           || 'Not assigned yet' },
-      { icon:'fa-phone',        label:'Phone',        value: d.phone                             || '—' },
-      { icon:'fa-calendar',     label:'Member Since', value: d.created_at                        || '—' },
+      { icon:'fa-user',         label:'Full Name',   value: d.name                         || '—' },
+      { icon:'fa-envelope',     label:'Email',        value: d.email                        || '—' },
+      { icon:'fa-layer-group',  label:'Department',   value: d.department                   || '—' },
+      { icon:'fa-calendar-alt', label:'Year',         value: d.year ? `Year ${d.year}`      : '—' },
+      { icon:'fa-bookmark',     label:'Section',      value: d.section                      || '—' },
+      { icon:'fa-id-badge',     label:'Class ID',     value: d.classId                      || 'Not assigned yet' },
+      { icon:'fa-phone',        label:'Phone',        value: d.phone                        || '—' },
+      { icon:'fa-calendar',     label:'Member Since', value: d.created_at                   || '—' },
     ];
-
     grid.innerHTML = fields.map(f => `
       <div class="prof-field">
         <div class="pf-icon"><i class="fas ${f.icon}"></i></div>
@@ -722,25 +719,19 @@ const StudentProfile = {
 
   toggleEdit() {
     this.editing = !this.editing;
-    const viewCard = $('profViewCard');
-    const editCard = $('profEditCard');
-    const btn      = $('profEditBtn');
-
     if (this.editing) {
-      // Pre-fill form
       $('efName').value    = this.data.name       || '';
       $('efDept').value    = this.data.department || '';
       $('efYear').value    = this.data.year       || '1';
       $('efSection').value = this.data.section    || 'A';
       $('efPhone').value   = this.data.phone      || '';
-
-      viewCard.style.display = 'none';
-      editCard.style.display = '';
-      btn.innerHTML = '<i class="fas fa-times"></i> Cancel';
+      $('profViewCard').style.display = 'none';
+      $('profEditCard').style.display = '';
+      $('profEditBtn').innerHTML = '<i class="fas fa-times"></i> Cancel';
     } else {
-      viewCard.style.display = '';
-      editCard.style.display = 'none';
-      btn.innerHTML = '<i class="fas fa-edit"></i> Edit Profile';
+      $('profViewCard').style.display = '';
+      $('profEditCard').style.display = 'none';
+      $('profEditBtn').innerHTML = '<i class="fas fa-edit"></i> Edit Profile';
     }
   },
 
@@ -750,56 +741,32 @@ const StudentProfile = {
     const year    = parseInt($('efYear').value);
     const section = $('efSection').value;
     const phone   = $('efPhone').value.trim();
-
     if (!name) return toast('Name cannot be empty', 'error');
-
     try {
-      // Find student record by email
       const students = await fetch(`${API}/students`).then(r => r.json());
       const me = students.find(s => s.email === user.email);
-
       if (me && me.student_id) {
-        // Update via PUT /students/{student_id}
         await fetch(`${API}/students/${me.student_id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name,
-            email:      user.email,
-            department: this.data.department || '',
-            year,
-            section,
-            phone,
-          }),
+          body: JSON.stringify({ name, email: user.email, department: this.data.department||'', year, section, phone }),
         });
       }
-
-      // Update local data
       this.data = { ...this.data, name, year, section, phone };
-
-      // Update sessionStorage
       const session = JSON.parse(sessionStorage.getItem('user') || '{}');
-      sessionStorage.setItem('user', JSON.stringify({
-        ...session, name, year, section,
-      }));
+      sessionStorage.setItem('user', JSON.stringify({ ...session, name, year, section }));
       App.user = { ...App.user, name, year, section };
-
-      // Update sidebar + hero immediately
       $('sidebarName').textContent = name;
       $('userAvatar').textContent  = name[0].toUpperCase();
       $('profName').textContent    = name;
       $('profAvatar').textContent  = name[0].toUpperCase();
-
       this.renderFields(this.data);
       this.editing = false;
       $('profViewCard').style.display = '';
       $('profEditCard').style.display = 'none';
       $('profEditBtn').innerHTML = '<i class="fas fa-edit"></i> Edit Profile';
-
       toast('Profile updated successfully!');
-    } catch(e) {
-      toast(e.message || 'Save failed', 'error');
-    }
+    } catch(e) { toast(e.message || 'Save failed', 'error'); }
   },
 };
 
