@@ -172,9 +172,16 @@
 
       // Save session — used by all three SPAs
       sessionStorage.setItem('user', JSON.stringify({
-        name:  data.name,
-        email: email,
-        role:  data.role,
+        name:           data.name,
+        email:          email,
+        role:           data.role,
+        token:          data.token,           // JWT for API auth
+        classId:        data.classId    || '',
+        year:           data.year       || '',
+        section:        data.section    || '',
+        department:     data.department || '',
+        subjects:       data.subjects   || [],
+        qualifications: data.qualifications || '',
       }));
 
       // Redirect to the right SPA

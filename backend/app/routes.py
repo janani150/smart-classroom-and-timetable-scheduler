@@ -20,14 +20,22 @@ Sections:
   16. Attendance      GET/POST /attendance  GET /attendance/summary/{class_id}
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends, Header
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List, Dict, Any, Optional
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from bson import ObjectId
 import hashlib
 import logging
 import random
 import bcrypt
+import os
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+# JWT
+from jose import JWTError, jwt
 
 from app.database import db
 from app.models import (
@@ -45,7 +53,20 @@ from app.models import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router  = APIRouter()
+security = HTTPBearer(auto_error=False)
+
+# ── JWT config (set these in your .env) ──────────────────────────────────────
+JWT_SECRET    = os.getenv("JWT_SECRET", "smartclassroom_secret_change_in_production")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_HOURS = 24
+
+# ── SMTP config (set these in your .env for email features) ──────────────────
+SMTP_HOST     = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER     = os.getenv("SMTP_USER", "")      # your Gmail address
+SMTP_PASS     = os.getenv("SMTP_PASS", "")      # Gmail app password
+SMTP_FROM     = os.getenv("SMTP_FROM", SMTP_USER)
 
 
 # ══════════════════════════════════════════════════
@@ -78,6 +99,90 @@ def serialize_doc(doc: dict) -> dict:
     if doc and "_id" in doc:
         doc["_id"] = str(doc["_id"])
     return doc
+
+
+# ── JWT helpers ───────────────────────────────────────────────────────────────
+
+def create_token(email: str, role: str) -> str:
+    """Create a signed JWT token valid for JWT_EXPIRE_HOURS."""
+    payload = {
+        "sub":   email,
+        "role":  role,
+        "exp":   datetime.utcnow() + timedelta(hours=JWT_EXPIRE_HOURS),
+        "iat":   datetime.utcnow(),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def decode_token(token: str) -> dict:
+    """Decode and verify a JWT. Raises HTTPException on failure."""
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """FastAPI dependency — validates Bearer token and returns payload."""
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return decode_token(credentials.credentials)
+
+
+def require_role(*roles):
+    """Dependency factory — only allows specified roles."""
+    def _check(user: dict = Depends(get_current_user)):
+        if user.get("role") not in roles:
+            raise HTTPException(status_code=403, detail=f"Requires role: {', '.join(roles)}")
+        return user
+    return _check
+
+
+# ── Email helper ─────────────────────────────────────────────────────────────
+
+def send_email(to: str, subject: str, html_body: str) -> bool:
+    """
+    Send an HTML email via SMTP.
+    Returns True on success, False if SMTP is not configured or fails.
+    Set SMTP_USER and SMTP_PASS in .env to enable.
+    """
+    if not SMTP_USER or not SMTP_PASS:
+        logger.warning("SMTP not configured — email not sent")
+        return False
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = SMTP_FROM or SMTP_USER
+        msg["To"]      = to
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_FROM or SMTP_USER, to, msg.as_string())
+        logger.info(f"Email sent to {to}: {subject}")
+        return True
+    except Exception as e:
+        logger.error(f"Email failed to {to}: {e}")
+        return False
+
+
+def email_template(title: str, body_html: str) -> str:
+    """Minimal branded HTML email template."""
+    return f"""
+    <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+      <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:24px;text-align:center;">
+        <h2 style="color:#fff;margin:0;">🎓 SmartClass</h2>
+      </div>
+      <div style="padding:28px;">
+        <h3 style="color:#1e1b4b;margin-top:0;">{title}</h3>
+        {body_html}
+        <p style="color:#6b7280;font-size:12px;margin-top:24px;">
+          This is an automated message from SmartClass. Do not reply to this email.
+        </p>
+      </div>
+    </div>
+    """
 
 
 COLLECTION_MAP = {
@@ -122,6 +227,25 @@ def signup_user(data: SignupRequest):
         user_doc["section"] = data.section
 
     db[collection_name].insert_one(user_doc)
+
+    # Send welcome email (non-blocking — fails silently if SMTP not configured)
+    send_email(
+        to      = data.email,
+        subject = "Welcome to SmartClass! 🎓",
+        html_body = email_template(
+            title = f"Welcome, {data.name}!",
+            body_html = f"""
+            <p>Your <strong>{data.role}</strong> account has been created successfully.</p>
+            <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+              <tr><td style="padding:8px;color:#6b7280;">Email</td><td style="padding:8px;font-weight:600;">{data.email}</td></tr>
+              <tr style="background:#f9fafb;"><td style="padding:8px;color:#6b7280;">Role</td><td style="padding:8px;font-weight:600;">{data.role.capitalize()}</td></tr>
+              <tr><td style="padding:8px;color:#6b7280;">Department</td><td style="padding:8px;font-weight:600;">{data.department or '—'}</td></tr>
+            </table>
+            <p>You can now <a href="#" style="color:#4f46e5;">log in to SmartClass</a>.</p>
+            """
+        )
+    )
+
     return {"message": f"{data.role.capitalize()} registered successfully"}
 
 
@@ -153,6 +277,7 @@ def login_user(data: LoginRequest):
         "role":    data.role,
         "name":    user.get("name", "User"),
         "email":   data.email,
+        "token":   create_token(data.email, data.role),   # ← JWT token
     }
 
     if data.role == "student":
@@ -197,6 +322,55 @@ def get_profile(
     if not user:
         raise HTTPException(status_code=404, detail=f"No {role} found with email '{email}'")
     return user
+
+
+@router.post("/change-password")
+def change_password(data: Dict[str, Any]):
+    """
+    Change password for any user role.
+    Body: { "email": "...", "role": "student|teacher|admin",
+            "currentPassword": "...", "newPassword": "..." }
+    Sends a confirmation email if SMTP is configured.
+    """
+    email        = data.get("email", "").strip()
+    role         = data.get("role", "").strip()
+    current_pw   = data.get("currentPassword", "")
+    new_pw       = data.get("newPassword", "")
+
+    if not email or not role or not current_pw or not new_pw:
+        raise HTTPException(status_code=400, detail="email, role, currentPassword and newPassword are required")
+    if role not in COLLECTION_MAP:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    if len(new_pw) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+
+    collection = COLLECTION_MAP[role]
+    user = db[collection].find_one({"email": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not verify_password(current_pw, user["password"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    db[collection].update_one(
+        {"email": email},
+        {"$set": {"password": hash_password(new_pw), "passwordChangedAt": str(date.today())}}
+    )
+
+    # Send confirmation email
+    send_email(
+        to        = email,
+        subject   = "Password changed — SmartClass",
+        html_body = email_template(
+            title     = "Password Changed Successfully",
+            body_html = f"""
+            <p>Hi <strong>{user.get('name', 'User')}</strong>,</p>
+            <p>Your SmartClass password was changed on <strong>{date.today()}</strong>.</p>
+            <p style="color:#ef4444;">If you did not make this change, please contact your admin immediately.</p>
+            """
+        )
+    )
+
+    return {"message": "Password changed successfully"}
 
 
 # ══════════════════════════════════════════════════
@@ -871,6 +1045,64 @@ def get_attendance_summary(class_id: str):
         result.append(s)
 
     return sorted(result, key=lambda x: x["rate"], reverse=True)
+
+
+@router.get("/attendance/student")
+def get_student_attendance_history(
+    studentId: str = Query(..., description="student_id or email of the student"),
+    classId:   Optional[str] = Query(None, description="Filter by class ID"),
+):
+    """
+    Full attendance history for one student.
+    Returns each session record showing present/absent status.
+    Used by the student SPA — Attendance History view.
+    """
+    # Build query — match by student_id or email inside present/absent arrays
+    query: Dict[str, Any] = {}
+    if classId:
+        query["classId"] = classId
+
+    records = list(db.attendance.find(query, {"_id": 0}))
+
+    history = []
+    total_sessions = 0
+    total_present  = 0
+
+    for rec in records:
+        present_list = rec.get("present", [])
+        absent_list  = rec.get("absent",  [])
+        all_ids      = present_list + absent_list
+
+        # Only include records where this student appears
+        if studentId not in all_ids:
+            continue
+
+        was_present = studentId in present_list
+        total_sessions += 1
+        if was_present:
+            total_present += 1
+
+        history.append({
+            "classId": rec.get("classId", ""),
+            "date":    rec.get("date", ""),
+            "slotKey": rec.get("slotKey", ""),
+            "faculty": rec.get("faculty", ""),
+            "status":  "present" if was_present else "absent",
+        })
+
+    # Sort by date descending
+    history.sort(key=lambda x: x["date"], reverse=True)
+
+    overall_rate = round(total_present / total_sessions * 100, 1) if total_sessions else 0.0
+
+    return {
+        "studentId":      studentId,
+        "totalSessions":  total_sessions,
+        "totalPresent":   total_present,
+        "totalAbsent":    total_sessions - total_present,
+        "overallRate":    overall_rate,
+        "history":        history,
+    }
 
 
 # ══════════════════════════════════════════════════

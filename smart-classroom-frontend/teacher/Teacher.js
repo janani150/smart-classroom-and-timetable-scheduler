@@ -17,8 +17,13 @@ function toast(msg, type = 'success') {
 }
 
 async function api(path, opts = {}) {
+  const user  = getSession();
+  const token = user.token || '';
   const res = await fetch(`${API}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
     ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
@@ -907,6 +912,27 @@ Views.profile = async (vc) => {
           Cancel
         </button>
       </div>
+    </div>
+
+    <!-- Change Password -->
+    <div class="card anim anim-d2">
+      <div class="card-title"><i class="fas fa-lock"></i> Change Password</div>
+      <div class="form-grid" style="max-width:480px;">
+        <div class="fg full"><label>Current Password</label>
+          <input type="password" id="pwCurrent" placeholder="Enter current password">
+        </div>
+        <div class="fg"><label>New Password</label>
+          <input type="password" id="pwNew" placeholder="Min 6 characters">
+        </div>
+        <div class="fg"><label>Confirm New Password</label>
+          <input type="password" id="pwConfirm" placeholder="Repeat new password">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="TeacherProfile.changePassword()">
+          <i class="fas fa-key"></i> Update Password
+        </button>
+      </div>
     </div>`;
 
   await TeacherProfile.load();
@@ -1037,6 +1063,26 @@ const TeacherProfile = {
     } catch(e) {
       toast(e.message || 'Save failed', 'error');
     }
+  },
+
+  async changePassword() {
+    const user    = App.user;
+    const current = $('pwCurrent').value;
+    const nw      = $('pwNew').value;
+    const confirm = $('pwConfirm').value;
+    if (!current || !nw || !confirm) return toast('Fill all password fields', 'error');
+    if (nw.length < 6)               return toast('New password must be at least 6 characters', 'error');
+    if (nw !== confirm)              return toast('New passwords do not match', 'error');
+    try {
+      await api('/change-password', {
+        method: 'POST',
+        body: { email: user.email, role: 'teacher', currentPassword: current, newPassword: nw },
+      });
+      $('pwCurrent').value = '';
+      $('pwNew').value     = '';
+      $('pwConfirm').value = '';
+      toast('Password changed! A confirmation email has been sent.', 'success');
+    } catch(e) { toast(e.message || 'Could not change password', 'error'); }
   },
 };
 

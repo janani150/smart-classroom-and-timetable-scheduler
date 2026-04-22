@@ -304,3 +304,49 @@ input:checked + .slider:before { transform:translateX(20px); }
   .prof-hero { flex-direction: column; text-align: center; }
   .prof-edit-btn { margin: 0 auto; }
 }
+
+/* ══════════════════════════════════════════
+   MOBILE RESPONSIVE — Teacher SPA
+══════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-100%); transition: transform .25s ease; }
+  .sidebar.open { transform: translateX(0); }
+  .main-wrap { margin-left: 0 !important; }
+  .menu-toggle { display: flex !important; }
+  .view-container { padding: 16px 14px; }
+  .topbar { padding: 0 14px; }
+
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat-card { padding: 14px 12px; }
+
+  .pb-card { flex-direction: column; gap: 12px; padding: 16px; }
+  .pb-avatar { width: 54px; height: 54px; font-size: 22px; }
+
+  .tt { font-size: 11px; }
+  .tt th, .tt td { padding: 6px 4px; min-width: 55px; }
+  .tt-class { font-size: 11px; }
+  .tt-sub   { font-size: 10px; }
+
+  .att-class-card { padding: 14px; }
+  .acc-header { flex-direction: column; gap: 10px; }
+  .student-row { flex-wrap: wrap; gap: 8px; }
+
+  .prof-hero { flex-direction: column; text-align: center; }
+  .prof-edit-btn { margin: 0 auto; }
+  .prof-field-grid { grid-template-columns: 1fr; }
+
+  .form-grid { grid-template-columns: 1fr !important; }
+  .fg.full { grid-column: 1; }
+  .btn-row { flex-wrap: wrap; }
+
+  .class-grid { grid-template-columns: 1fr !important; }
+
+  .change-row { flex-wrap: wrap; gap: 6px; padding: 10px; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .topbar-right { gap: 6px; }
+  .tt { font-size: 10px; }
+  .tt th, .tt td { padding: 4px 3px; min-width: 45px; }
+}

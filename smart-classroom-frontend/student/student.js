@@ -17,8 +17,13 @@ function toast(msg, type = 'success') {
 }
 
 async function api(path, opts = {}) {
+  const user  = getSession();
+  const token = user.token || '';
   const res = await fetch(`${API}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
     ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
@@ -89,7 +94,7 @@ const App = {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === view));
     const titles = {
       dashboard:'Dashboard', timetable:'My Timetable', upcoming:'Upcoming Classes',
-      notifications:'Notifications', profile:'My Profile'
+      attendance:'Attendance History', notifications:'Notifications', profile:'My Profile'
     };
     $('topbarTitle').textContent = titles[view] || view;
 
@@ -446,6 +451,101 @@ Views.upcoming = async (vc) => {
 };
 
 /* ─────────────────────────────
+   ATTENDANCE HISTORY
+───────────────────────────── */
+Views.attendance = async (vc) => {
+  const user    = App.user;
+  let classId   = App.getClassId();
+  const latest  = await fetchLatestClassId(user.email);
+  if (latest) classId = latest;
+
+  // Get student's own ID from profile
+  let studentId = user.email; // fallback to email if no student_id
+  try {
+    const profile = await fetch(`${API}/profile/student?email=${encodeURIComponent(user.email)}`).then(r => r.json());
+    if (profile.student_id) studentId = profile.student_id;
+  } catch {}
+
+  vc.innerHTML = `
+    <div class="page-hdr anim"><h1>Attendance History</h1><p>Your attendance record across all sessions.</p></div>
+
+    <!-- Summary cards -->
+    <div class="stats-grid anim" id="attStats">
+      <div class="stat-card"><div class="stat-icon si-teal"><i class="fas fa-calendar-check"></i></div>
+        <div><div class="stat-val" id="attTotal">—</div><div class="stat-lbl">Total Sessions</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-green"><i class="fas fa-user-check"></i></div>
+        <div><div class="stat-val" id="attPresent">—</div><div class="stat-lbl">Present</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-red"><i class="fas fa-user-times"></i></div>
+        <div><div class="stat-val" id="attAbsent">—</div><div class="stat-lbl">Absent</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-purple"><i class="fas fa-percent"></i></div>
+        <div><div class="stat-val" id="attRate">—</div><div class="stat-lbl">Overall Rate</div></div></div>
+    </div>
+
+    <!-- Attendance bar -->
+    <div class="card anim anim-d1" id="attBarCard" style="display:none;">
+      <div class="card-title"><i class="fas fa-chart-bar"></i> Attendance Rate</div>
+      <div style="background:#f3f4f6;border-radius:8px;height:18px;overflow:hidden;margin-bottom:6px;">
+        <div id="attBar" style="height:100%;border-radius:8px;background:var(--accent);transition:width .6s ease;width:0%"></div>
+      </div>
+      <div id="attBarLabel" style="font-size:12px;color:var(--muted);text-align:right;"></div>
+      <div id="attWarning" style="display:none;margin-top:10px;padding:10px 14px;background:#fef2f2;border-radius:8px;color:#dc2626;font-size:13px;">
+        <i class="fas fa-exclamation-triangle"></i> Your attendance is below 75%. You may be at risk of being barred from exams.
+      </div>
+    </div>
+
+    <!-- History table -->
+    <div class="card anim anim-d2" style="padding:0;overflow:hidden;">
+      <table class="tbl">
+        <thead><tr><th>Date</th><th>Class</th><th>Slot</th><th>Faculty</th><th>Status</th></tr></thead>
+        <tbody id="attBody">
+          <tr><td colspan="5" style="text-align:center;padding:28px;color:var(--muted);">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>`;
+
+  try {
+    const url = `${API}/attendance/student?studentId=${encodeURIComponent(studentId)}${classId ? `&classId=${encodeURIComponent(classId)}` : ''}`;
+    const data = await fetch(url).then(r => r.json());
+
+    $('attTotal').textContent   = data.totalSessions  || 0;
+    $('attPresent').textContent = data.totalPresent   || 0;
+    $('attAbsent').textContent  = data.totalAbsent    || 0;
+    $('attRate').textContent    = `${data.overallRate || 0}%`;
+
+    // Animate attendance bar
+    const rate = data.overallRate || 0;
+    $('attBarCard').style.display = '';
+    setTimeout(() => {
+      $('attBar').style.width = `${rate}%`;
+      $('attBar').style.background = rate >= 75 ? '#10b981' : rate >= 50 ? '#f59e0b' : '#ef4444';
+      $('attBarLabel').textContent = `${rate}% attendance`;
+      if (rate < 75 && data.totalSessions > 0) $('attWarning').style.display = '';
+    }, 100);
+
+    const history = data.history || [];
+    if (!history.length) {
+      $('attBody').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--muted);">No attendance records yet.</td></tr>';
+      return;
+    }
+
+    $('attBody').innerHTML = history.map(h => `
+      <tr>
+        <td style="font-size:13px;">${h.date || '—'}</td>
+        <td><span class="badge badge-blue">${h.classId || '—'}</span></td>
+        <td style="font-size:12px;font-weight:600;">${h.slotKey || '—'}</td>
+        <td style="font-size:12px;color:var(--muted);">${h.faculty || '—'}</td>
+        <td>
+          <span class="badge ${h.status === 'present' ? 'badge-green' : 'badge-red'}">
+            ${h.status === 'present' ? '✓ Present' : '✗ Absent'}
+          </span>
+        </td>
+      </tr>`).join('');
+  } catch {
+    $('attBody').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--muted);">Could not load attendance records.</td></tr>';
+  }
+};
+
+/* ─────────────────────────────
    NOTIFICATIONS
 ───────────────────────────── */
 Views.notifications = async (vc) => {
@@ -559,6 +659,27 @@ Views.profile = async (vc) => {
         <button class="btn btn-primary" onclick="StudentProfile.save()"><i class="fas fa-save"></i> Save Changes</button>
         <button class="btn btn-ghost" onclick="StudentProfile.toggleEdit()">Cancel</button>
       </div>
+    </div>
+
+    <!-- Change Password -->
+    <div class="card anim anim-d2">
+      <div class="card-title"><i class="fas fa-lock"></i> Change Password</div>
+      <div class="form-grid" style="max-width:480px;">
+        <div class="fg full"><label>Current Password</label>
+          <input type="password" id="pwCurrent" placeholder="Enter current password">
+        </div>
+        <div class="fg"><label>New Password</label>
+          <input type="password" id="pwNew" placeholder="Min 6 characters">
+        </div>
+        <div class="fg"><label>Confirm New Password</label>
+          <input type="password" id="pwConfirm" placeholder="Repeat new password">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="StudentProfile.changePassword()">
+          <i class="fas fa-key"></i> Update Password
+        </button>
+      </div>
     </div>`;
 
   await StudentProfile.load();
@@ -671,6 +792,26 @@ const StudentProfile = {
       $('profEditBtn').innerHTML = '<i class="fas fa-edit"></i> Edit Profile';
       toast('Profile updated successfully!');
     } catch(e) { toast(e.message || 'Save failed', 'error'); }
+  },
+
+  async changePassword() {
+    const user    = App.user;
+    const current = $('pwCurrent').value;
+    const nw      = $('pwNew').value;
+    const confirm = $('pwConfirm').value;
+    if (!current || !nw || !confirm) return toast('Fill all password fields', 'error');
+    if (nw.length < 6)               return toast('New password must be at least 6 characters', 'error');
+    if (nw !== confirm)              return toast('New passwords do not match', 'error');
+    try {
+      await api('/change-password', {
+        method: 'POST',
+        body: { email: user.email, role: 'student', currentPassword: current, newPassword: nw },
+      });
+      $('pwCurrent').value = '';
+      $('pwNew').value     = '';
+      $('pwConfirm').value = '';
+      toast('Password changed! A confirmation email has been sent.', 'success');
+    } catch(e) { toast(e.message || 'Could not change password', 'error'); }
   },
 };
 

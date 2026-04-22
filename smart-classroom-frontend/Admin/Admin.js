@@ -24,8 +24,13 @@ function toast(msg, type = 'success', icon = '') {
 }
 
 async function api(path, options = {}) {
+  const user  = App.getSession();
+  const token = user.token || '';
   const res = await fetch(`${API}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
     ...options,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
@@ -1253,14 +1258,23 @@ const ProfileAdmin = {
   },
 
   changePassword() {
+    const user    = App.getSession();
     const current = $('pwCurrent').value;
     const nw      = $('pwNew').value;
     const confirm = $('pwConfirm').value;
     if (!current || !nw || !confirm) return toast('Fill all password fields', 'error');
     if (nw.length < 6)               return toast('New password must be at least 6 characters', 'error');
     if (nw !== confirm)              return toast('New passwords do not match', 'error');
-    // Password change endpoint not yet implemented — show info toast
-    toast('Password change requires a /change-password backend endpoint (not yet implemented)', 'info');
+
+    api('/change-password', {
+      method: 'POST',
+      body: { email: user.email, role: 'admin', currentPassword: current, newPassword: nw },
+    }).then(() => {
+      $('pwCurrent').value = '';
+      $('pwNew').value     = '';
+      $('pwConfirm').value = '';
+      toast('Password changed! A confirmation email has been sent.', 'success');
+    }).catch(e => toast(e.message || 'Could not change password', 'error'));
   },
 };
 

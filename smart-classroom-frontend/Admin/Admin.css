@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    Smart Classroom Admin SPA — admin.css
-   Theme: Dark sidebar · Light canvas · DM Sans (370)
+   Theme: Dark sidebar · Light canvas · DM Sans
 ═══════════════════════════════════════════════════ */
 
 /* ── Variables ── */
@@ -367,7 +367,7 @@ table.tbl tr:hover td { background: #fafbff; }
 }
 .ph-name  { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
 .ph-email { font-size: 13px; opacity: .82; margin-bottom: 8px; }
-.ph-role  {font-size: 13px; opacity: .82; margin-bottom: 8px;  }
+.ph-role  { }
 
 .profile-grid {
   display: grid;
@@ -417,4 +417,58 @@ table.tbl tr:hover td { background: #fafbff; }
 .stat-card-link:hover .stat-arrow {
   opacity: 1;
   right: 10px;
+}
+
+/* ══════════════════════════════════════════
+   MOBILE RESPONSIVE — Admin SPA
+══════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-100%); transition: transform .25s ease; }
+  .sidebar.open { transform: translateX(0); }
+  .main-wrap { margin-left: 0 !important; }
+  .menu-toggle { display: flex !important; }
+  .view-container { padding: 16px 14px; }
+  .topbar { padding: 0 14px; }
+  .search-box { display: none; }
+
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat-card { padding: 14px 12px; }
+  .stat-val { font-size: 22px; }
+  .stat-arrow { display: none; }
+
+  .card { padding: 16px; }
+  .form-grid { grid-template-columns: 1fr !important; }
+  .fg.full { grid-column: 1; }
+  .btn-row { flex-wrap: wrap; gap: 8px; }
+
+  /* Tables scroll horizontally on mobile */
+  .tbl-wrap, .tbl { display: block; overflow-x: auto; white-space: nowrap; }
+  .tbl th, .tbl td { padding: 8px 10px; font-size: 12px; }
+
+  /* Timetable viewer */
+  .tt-table { font-size: 11px; }
+  .tt-table th, .tt-table td { padding: 5px 4px; min-width: 60px; }
+  .tt-edit-input { font-size: 11px; width: 70px; }
+
+  /* Profile */
+  .profile-hero { flex-direction: column; text-align: center; padding: 20px; }
+  .profile-grid { grid-template-columns: 1fr; }
+
+  /* Rule cards */
+  .rule-card { flex-direction: column; gap: 10px; }
+  .rule-card-actions { justify-content: flex-start; }
+
+  /* Slot change */
+  .change-row { flex-wrap: wrap; gap: 6px; }
+
+  /* Students/Teachers list */
+  .page-hdr { flex-direction: column; align-items: flex-start; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .stat-lbl { font-size: 10px; }
+  .topbar-title { font-size: 14px; }
+  .btn { font-size: 12px; padding: 8px 12px; }
+  .badge { font-size: 10px; padding: 2px 6px; }
 }
