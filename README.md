@@ -38,11 +38,11 @@ The system consists of a **FastAPI backend**, a web-based frontend, and a dedica
 ### Students Dashboard 
 ![Timetable](Screenshots/admin/Students/StudentsDashboard.png)
 
-### College details in admin panel
+### Admin Panel — College Details
 ![FastAPI Swagger UI](Screenshots/admin/collegedetails1.png)
 ![FastAPI Swagger UI](Screenshots/admin/collegedetails2.png)
 
-### TimeTable
+### Timetable Management
 ![FastAPI Swagger UI](Screenshots/admin/Timetable.png)
 ![Timetable](Screenshots/admin/timetableRuls.png)
 
