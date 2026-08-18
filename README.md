@@ -29,6 +29,22 @@ The system consists of a **FastAPI backend**, a web-based frontend, and a dedica
 
 - 📊 **Web Dashboard**
   - User-friendly interface for viewing schedules and managing academic information.
+ 
+## 📸 Screenshots
+
+### Teacher Dashboard
+![FastAPI Swagger UI](Screenshots/admin/Tearcher/TeacherDashboard.png)
+
+### Students Dashboard 
+![Timetable](Screenshots/admin/Students/StudentsDashboard.png)
+
+### College details in admin panel
+![FastAPI Swagger UI](Screenshots/admin/collegedetails1.png)
+![FastAPI Swagger UI](Screenshots/admin/collegedetails2.png)
+
+### TimeTable
+![FastAPI Swagger UI](Screenshots/admin/Timetable.png)
+![Timetable](Screenshots/admin/timetableRuls.png)
 
 ## 📂 Project Structure
 
